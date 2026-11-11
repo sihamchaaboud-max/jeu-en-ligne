@@ -1,0 +1,21 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Éditeurs
+.vscode/
+.idea/
+
+# Données locales
+data/
+*.rdb
+dump/
+
+# Système
+.DS_Store
+Thumbs.db
