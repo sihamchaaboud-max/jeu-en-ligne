@@ -1,142 +1,62 @@
-"""
-Tests du service Neo4j
-
-Pré-requis : Neo4j doit être en cours d'exécution (docker-compose up).
-
-Lancer avec :  pytest tests/test_neo4j.py -v
-"""
-
+"""Tests Neo4j. Neo4j doit tourner (docker compose up -d neo4j).
+Lancer :  python -m pytest tests/test_neo4j.py -v
+Graphe de test :  a-b, b-c, b-d, c-e"""
 import pytest
-from app.services.neo4j_service import Neo4jService
+from app.services import neo4j_service as neo
+
+IDS = ["t_a", "t_b", "t_c", "t_d", "t_e"]
 
 
-@pytest.fixture
-def neo4j_service():
-    """Crée une instance et nettoie le graphe avant/après les tests."""
-    service = Neo4jService()
-    # nettoyer tous les joueurs de test
-    with service.driver.session() as session:
-        session.run("MATCH (j:Joueur) DETACH DELETE j")
-    yield service
-    with service.driver.session() as session:
-        session.run("MATCH (j:Joueur) DETACH DELETE j")
-    service.close()
+@pytest.fixture(autouse=True)
+def graphe():
+    neo.initialiser_schema()
+    for i in IDS:
+        neo.supprimer_noeud(i)
+        neo.creer_noeud(i, f"pseudo_{i}")
+    for x, y in [("t_a", "t_b"), ("t_b", "t_c"), ("t_b", "t_d"), ("t_c", "t_e")]:
+        neo.ajouter_ami(x, y)
+    yield
+    for i in IDS:
+        neo.supprimer_noeud(i)
 
 
-class TestNoeudsJoueurs:
-    """Tests de création de noeuds joueurs."""
-
-    def test_creer_joueur(self, neo4j_service):
-        neo4j_service.creer_joueur("j1", "Oussama")
-        amis = neo4j_service.get_amis("j1")
-        assert amis == []  # aucun ami au début
-
-    def test_creer_joueur_idempotent(self, neo4j_service):
-        neo4j_service.creer_joueur("j1", "Oussama")
-        neo4j_service.creer_joueur("j1", "Oussama2")  # mise à jour du nom
-        # Ne devrait pas créer de doublon
-        with neo4j_service.driver.session() as session:
-            result = session.run(
-                "MATCH (j:Joueur {id: 'j1'}) RETURN j.nom AS nom"
-            )
-            records = list(result)
-        assert len(records) == 1
-        assert records[0]["nom"] == "Oussama2"
+def test_get_amis():
+    assert [a["id"] for a in neo.get_amis("t_b")] == ["t_a", "t_c", "t_d"]
 
 
-class TestAmitie:
-    """Tests des relations d'amitié."""
-
-    def test_ajouter_amitie(self, neo4j_service):
-        neo4j_service.creer_joueur("j1", "Oussama")
-        neo4j_service.creer_joueur("j2", "Siham")
-        neo4j_service.ajouter_amitie("j1", "j2")
-
-        amis_j1 = neo4j_service.get_amis("j1")
-        amis_j2 = neo4j_service.get_amis("j2")
-
-        assert len(amis_j1) == 1
-        assert amis_j1[0]["id"] == "j2"
-        assert len(amis_j2) == 1
-        assert amis_j2[0]["id"] == "j1"  # bidirectionnel
-
-    def test_get_amis_vide(self, neo4j_service):
-        neo4j_service.creer_joueur("j1", "Oussama")
-        assert neo4j_service.get_amis("j1") == []
-
-    def test_plusieurs_amis(self, neo4j_service):
-        for i, nom in enumerate(["Oussama", "Siham", "Yassine"], 1):
-            neo4j_service.creer_joueur(f"j{i}", nom)
-
-        neo4j_service.ajouter_amitie("j1", "j2")
-        neo4j_service.ajouter_amitie("j1", "j3")
-
-        amis = neo4j_service.get_amis("j1")
-        assert len(amis) == 2
+def test_amitie_symetrique():
+    assert neo.sont_amis("t_a", "t_b") and neo.sont_amis("t_b", "t_a")
 
 
-class TestAmisDamis:
-    """Tests des amis d'amis (recommandations)."""
-
-    def test_amis_damis_simple(self, neo4j_service):
-        """
-        Réseau : j1 - j2 - j3
-        j3 est ami d'ami de j1 mais pas ami direct.
-        """
-        neo4j_service.creer_joueur("j1", "Oussama")
-        neo4j_service.creer_joueur("j2", "Siham")
-        neo4j_service.creer_joueur("j3", "Yassine")
-
-        neo4j_service.ajouter_amitie("j1", "j2")
-        neo4j_service.ajouter_amitie("j2", "j3")
-
-        recommandations = neo4j_service.get_amis_damis("j1")
-        assert len(recommandations) == 1
-        assert recommandations[0]["id"] == "j3"
-
-    def test_amis_damis_exclut_amis_directs(self, neo4j_service):
-        """
-        j1 - j2, j1 - j3, j2 - j3
-        j3 est ami direct de j1, donc ne doit pas apparaître
-        dans les amis d'amis.
-        """
-        for i, nom in enumerate(["Oussama", "Siham", "Yassine"], 1):
-            neo4j_service.creer_joueur(f"j{i}", nom)
-
-        neo4j_service.ajouter_amitie("j1", "j2")
-        neo4j_service.ajouter_amitie("j1", "j3")
-        neo4j_service.ajouter_amitie("j2", "j3")
-
-        recommandations = neo4j_service.get_amis_damis("j1")
-        # j3 est ami direct de j1 -> exclu
-        # j2 est ami direct de j1 -> exclu
-        assert len(recommandations) == 0
-
-    def test_amis_damis_exclut_joueur_lui_meme(self, neo4j_service):
-        """
-        j1 - j2, j2 - j1 (déjà via bidirectionnel)
-        Le joueur lui-même ne doit pas apparaître dans ses amis d'amis.
-        """
-        neo4j_service.creer_joueur("j1", "Oussama")
-        neo4j_service.creer_joueur("j2", "Siham")
-        neo4j_service.ajouter_amitie("j1", "j2")
-
-        recommandations = neo4j_service.get_amis_damis("j1")
-        # j1 ne doit pas se recommander lui-même
-        ids = [r["id"] for r in recommandations]
-        assert "j1" not in ids
+def test_ajouter_ami_sans_doublon():
+    neo.ajouter_ami("t_a", "t_b")
+    neo.ajouter_ami("t_b", "t_a")          # dans l'autre sens
+    assert len(neo.get_amis("t_a")) == 1
 
 
-class TestSuppression:
-    """Tests de suppression."""
+def test_pas_ami_avec_soi_meme():
+    assert neo.ajouter_ami("t_a", "t_a") is False
 
-    def test_supprimer_joueur_supprime_relations(self, neo4j_service):
-        neo4j_service.creer_joueur("j1", "Oussama")
-        neo4j_service.creer_joueur("j2", "Siham")
-        neo4j_service.ajouter_amitie("j1", "j2")
 
-        neo4j_service.supprimer_joueur("j1")
+def test_ami_inexistant():
+    assert neo.ajouter_ami("t_a", "n_existe_pas") is False
 
-        # j2 ne doit plus avoir j1 comme ami
-        amis_j2 = neo4j_service.get_amis("j2")
-        assert len(amis_j2) == 0
+
+def test_get_amis_d_amis():
+    assert {x["id"] for x in neo.get_amis_d_amis("t_a")} == {"t_c", "t_d"}
+
+
+def test_amis_d_amis_exclut_les_amis_directs():
+    neo.ajouter_ami("t_a", "t_c")
+    assert "t_c" not in {x["id"] for x in neo.get_amis_d_amis("t_a")}
+
+
+def test_supprimer_ami():
+    assert neo.supprimer_ami("t_a", "t_b") is True
+    assert neo.get_amis("t_a") == []
+    assert neo.supprimer_ami("t_a", "t_b") is False
+
+
+def test_supprimer_noeud_supprime_les_amities():
+    neo.supprimer_noeud("t_b")
+    assert neo.get_amis("t_a") == []
