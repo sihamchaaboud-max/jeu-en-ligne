@@ -1,24 +1,36 @@
-﻿services:
-  mongo:
+services:
+  # MongoDB - Profils joueurs + inventaires (Siham)
+  mongodb:
     image: mongo:7
-    container_name: game-mongo
-    ports: ["27017:27017"]
-    volumes: [mongo_data:/data/db]
+    container_name: jeu_mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
 
+  # Redis - Scores + classements (Oussama)
   redis:
-    image: redis:7
-    container_name: game-redis
-    ports: ["6379:6379"]
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes: [redis_data:/data]
+    image: redis:7-alpine
+    container_name: jeu_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
 
+  # Neo4j - Relations d'amitié (Salma)
   neo4j:
     image: neo4j:5
-    container_name: game-neo4j
-    ports: ["7474:7474", "7687:7687"]
+    container_name: jeu_neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
     environment:
-      NEO4J_AUTH: neo4j/password123
-    volumes: [neo4j_data:/data]
+      - NEO4J_AUTH=neo4j/password123
+    volumes:
+      - neo4j_data:/data
+    restart: unless-stopped
 
 volumes:
   mongo_data:
