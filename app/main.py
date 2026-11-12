@@ -14,6 +14,7 @@ Lancer avec :  python -m app.main
 """
 
 from app.joueur_service import JoueurService
+from app.services import neo4j_service as neo4j
 
 
 def afficher_separateur(titre: str):
@@ -55,8 +56,11 @@ def action_ajouter_ami(service: JoueurService):
     joueur_id = input("ID du joueur : ").strip()
     ami_id = input("ID de l'ami à ajouter : ").strip()
 
-    service.neo4j.ajouter_amitie(joueur_id, ami_id)
-    print(f"\n✓ Amitié ajoutée : {joueur_id} <-> {ami_id}")
+    ok = neo4j.ajouter_ami(joueur_id, ami_id)
+    if ok:
+        print(f"\n✓ Amitié ajoutée : {joueur_id} <-> {ami_id}")
+    else:
+        print(f"\n✗ Impossible d'ajouter l'amitié (joueur inexistant ou déjà amis).")
 
 
 def action_voir_profil(service: JoueurService):
@@ -124,7 +128,7 @@ def action_voir_amis(service: JoueurService):
     """Affiche les amis directs d'un joueur."""
     joueur_id = input("ID du joueur : ").strip()
 
-    amis = service.neo4j.get_amis(joueur_id)
+    amis = neo4j.get_amis(joueur_id)
 
     if not amis:
         print(f"\n'{joueur_id}' n'a pas encore d'amis.")
@@ -132,14 +136,14 @@ def action_voir_amis(service: JoueurService):
 
     print(f"\n--- AMIS DE {joueur_id} ({len(amis)}) ---")
     for ami in amis:
-        print(f"  {ami['id']:<15} {ami['nom']}")
+        print(f"  {ami['id']:<15} {ami['pseudo']}")
 
 
 def action_amis_damis(service: JoueurService):
     """Affiche les amis d'amis (recommandations)."""
     joueur_id = input("ID du joueur : ").strip()
 
-    recommandations = service.neo4j.get_amis_damis(joueur_id)
+    recommandations = neo4j.get_amis_d_amis(joueur_id)
 
     if not recommandations:
         print(f"\nAucune recommandation d'ami pour '{joueur_id}'.")
@@ -147,7 +151,7 @@ def action_amis_damis(service: JoueurService):
 
     print(f"\n--- AMIS D'AMIS - RECOMMANDATIONS ({joueur_id}) ---")
     for rec in recommandations:
-        print(f"  {rec['id']:<15} {rec['nom']}")
+        print(f"  {rec['id']:<15} {rec['pseudo']}  ({rec['amis_communs']} amis en commun)")
 
 
 def action_voir_inventaire(service: JoueurService):

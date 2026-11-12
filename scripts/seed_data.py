@@ -15,6 +15,7 @@ le classement entre amis et les recommandations (amis d'amis).
 """
 
 from app.joueur_service import JoueurService
+from app.services import neo4j_service as neo4j
 
 
 # --------------------------------------------------
@@ -65,7 +66,7 @@ def run():
 
     print("\nAjout des amitiés...")
     for j1, j2 in AMITIES:
-        service.neo4j.ajouter_amitie(j1, j2)
+        neo4j.ajouter_ami(j1, j2)
         print(f"  ✓ {j1} <-> {j2}")
 
     print("\n" + "=" * 50)
@@ -86,9 +87,9 @@ def run():
 
     # Vérification : amis d'amis de j1
     print("\n--- Amis d'amis de j1 (recommandations) ---")
-    recommandations = service.neo4j.get_amis_damis("j1")
+    recommandations = neo4j.get_amis_d_amis("j1")
     for rec in recommandations:
-        print(f"  {rec['id']:<6} {rec['nom']}")
+        print(f"  {rec['id']:<6} {rec['pseudo']}  ({rec['amis_communs']} amis en commun)")
 
     service.close()
 

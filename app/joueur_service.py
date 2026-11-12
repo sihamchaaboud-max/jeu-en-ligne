@@ -11,11 +11,16 @@ pour offrir une logique métier unifiée :
 
 C'est le point d'entrée unique pour les opérations qui touchent
 plusieurs bases de données simultanément.
+
+Dépendances :
+  - mongo_service  : style classe  (MongoService)
+  - redis_service  : style classe  (RedisService)
+  - neo4j_service  : style fonctionnel (fonctions directes — Salma)
 """
 
 from app.services.mongo_service import MongoService
 from app.services.redis_service import RedisService
-from app.services.neo4j_service import Neo4jService
+from app.services import neo4j_service as neo4j
 
 
 class JoueurService:
@@ -25,11 +30,12 @@ class JoueurService:
         """Initialise les connexions aux trois bases."""
         self.mongo = MongoService()
         self.redis = RedisService()
-        self.neo4j = Neo4jService()
+        # Neo4j utilise un driver module-level (style fonctionnel de Salma)
+        neo4j.initialiser_schema()
 
     def close(self):
         """Ferme les connexions ouvertes."""
-        self.neo4j.close()
+        neo4j.fermer()
 
     # ==================================================
     # Création de joueur (intégration 3 bases)
@@ -60,8 +66,8 @@ class JoueurService:
         # 2. Redis : score
         self.redis.set_score(joueur_id, score_initial)
 
-        # 3. Neo4j : noeud
-        self.neo4j.creer_joueur(joueur_id, nom)
+        # 3. Neo4j : noeud (pseudo = même valeur que nom)
+        neo4j.creer_noeud(joueur_id, nom)
 
     # ==================================================
     # Top 10 global
@@ -96,7 +102,7 @@ class JoueurService:
         Combine Neo4j (liste d'amis) et Redis (scores).
 
         Étapes :
-          1. Récupérer les amis directs depuis Neo4j
+          1. Récupérer les IDs des amis directs depuis Neo4j
           2. Ajouter le joueur lui-même à la liste
           3. Demander à Redis les scores de tous ces joueurs
           4. Enrichir avec les noms depuis MongoDB
@@ -108,9 +114,8 @@ class JoueurService:
             Liste de dictionnaires triés par rang :
             {"rang": int, "id": str, "nom": str, "score": int}
         """
-        # 1. Amis depuis Neo4j
-        amis = self.neo4j.get_amis(joueur_id)
-        ids_a_classer = [a["id"] for a in amis]
+        # 1. IDs des amis depuis Neo4j (fonction dédiée de Salma)
+        ids_a_classer = neo4j.get_ids_amis(joueur_id)
 
         # 2. Ajouter le joueur lui-même
         if joueur_id not in ids_a_classer:
@@ -136,4 +141,4 @@ class JoueurService:
         """Supprime un joueur des trois bases."""
         self.mongo.supprimer_joueur(joueur_id)
         self.redis.delete_score(joueur_id)
-        self.neo4j.supprimer_joueur(joueur_id)
+        neo4j.supprimer_noeud(joueur_id)
