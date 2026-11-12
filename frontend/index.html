@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🎮 Jeu en Ligne — NoSQL Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- ═══════════════ HEADER ═══════════════ -->
+<header>
+  <div class="header-inner">
+    <div class="logo">🎮 <span>Jeu en Ligne</span></div>
+    <div class="header-badges">
+      <span class="badge mongo">MongoDB</span>
+      <span class="badge redis">Redis</span>
+      <span class="badge neo4j">Neo4j</span>
+    </div>
+    <div class="status-bar" id="statusBar">
+      <span class="dot dot-ok" id="statusDot"></span>
+      <span id="statusText">Connexion...</span>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════ NAV ═══════════════ -->
+<nav>
+  <button class="nav-btn active" onclick="showPage('dashboard')">📊 Dashboard</button>
+  <button class="nav-btn" onclick="showPage('joueurs')">👤 Joueurs</button>
+  <button class="nav-btn" onclick="showPage('classement')">🏆 Classement</button>
+  <button class="nav-btn" onclick="showPage('amis')">👥 Amis</button>
+  <button class="nav-btn" onclick="showPage('nouveau')">➕ Nouveau joueur</button>
+</nav>
+
+<!-- ═══════════════ PAGES ═══════════════ -->
+<main>
+
+  <!-- ── PAGE DASHBOARD ── -->
+  <section id="page-dashboard" class="page active">
+    <h2>Dashboard</h2>
+
+    <!-- Stats cards -->
+    <div class="cards-grid">
+      <div class="card card-blue">
+        <div class="card-icon">👤</div>
+        <div class="card-value" id="statTotal">—</div>
+        <div class="card-label">Joueurs total</div>
+      </div>
+      <div class="card card-yellow">
+        <div class="card-icon">🏆</div>
+        <div class="card-value" id="statLeader">—</div>
+        <div class="card-label">Leader</div>
+      </div>
+      <div class="card card-green">
+        <div class="card-icon">⭐</div>
+        <div class="card-value" id="statTopScore">—</div>
+        <div class="card-label">Score max</div>
+      </div>
+      <div class="card card-purple">
+        <div class="card-icon">🔴</div>
+        <div class="card-value" id="statClasses">—</div>
+        <div class="card-label">Classés Redis</div>
+      </div>
+    </div>
+
+    <!-- Top 10 rapide -->
+    <div class="panel">
+      <div class="panel-header">
+        <h3>🏆 Top 10 Global</h3>
+        <button class="btn-refresh" onclick="loadTop10()">↻ Actualiser</button>
+      </div>
+      <div id="top10Container">
+        <div class="loading">Chargement...</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PAGE JOUEURS ── -->
+  <section id="page-joueurs" class="page">
+    <h2>Joueurs</h2>
+
+    <div class="search-bar">
+      <input type="text" id="searchJoueur" placeholder="🔍 Rechercher un joueur..." oninput="filterJoueurs()"/>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <h3>Liste des joueurs</h3>
+        <button class="btn-refresh" onclick="loadJoueurs()">↻ Actualiser</button>
+      </div>
+      <div id="joueursContainer">
+        <div class="loading">Chargement...</div>
+      </div>
+    </div>
+
+    <!-- Profil détaillé -->
+    <div class="panel" id="profilPanel" style="display:none">
+      <div class="panel-header">
+        <h3 id="profilTitre">Profil</h3>
+        <button class="btn-close" onclick="closePanel('profilPanel')">✕</button>
+      </div>
+      <div id="profilContent"></div>
+    </div>
+  </section>
+
+  <!-- ── PAGE CLASSEMENT ── -->
+  <section id="page-classement" class="page">
+    <h2>🏆 Classement</h2>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('tab-global', this)">Global</button>
+      <button class="tab" onclick="switchTab('tab-amis-class', this)">Entre amis</button>
+    </div>
+
+    <!-- Tab global -->
+    <div id="tab-global" class="tab-content active">
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Top 10 Mondial</h3>
+          <button class="btn-refresh" onclick="loadTop10Full()">↻</button>
+        </div>
+        <div id="top10Full"><div class="loading">Chargement...</div></div>
+      </div>
+    </div>
+
+    <!-- Tab amis -->
+    <div id="tab-amis-class" class="tab-content">
+      <div class="panel">
+        <h3>Classement entre amis</h3>
+        <div class="form-row">
+          <input type="text" id="classAmisId" placeholder="ID du joueur (ex: j1)" />
+          <button class="btn-primary" onclick="loadClassementAmis()">Afficher</button>
+        </div>
+        <div id="classAmisResult"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PAGE AMIS ── -->
+  <section id="page-amis" class="page">
+    <h2>👥 Réseau d'amis</h2>
+
+    <div class="panel">
+      <h3>Explorer les amis</h3>
+      <div class="form-row">
+        <input type="text" id="amisJoueurId" placeholder="ID du joueur (ex: j1)" />
+        <button class="btn-primary" onclick="loadAmis()">Afficher</button>
+      </div>
+    </div>
+
+    <div class="tabs" id="amisTabs" style="display:none">
+      <button class="tab active" onclick="switchTab('tab-amis-directs', this)">Amis directs</button>
+      <button class="tab" onclick="switchTab('tab-amis-reco', this)">Recommandations</button>
+    </div>
+
+    <div id="tab-amis-directs" class="tab-content active" style="display:none">
+      <div class="panel">
+        <div class="panel-header">
+          <h3 id="amisDirectsTitre">Amis directs</h3>
+        </div>
+        <div class="form-row" style="margin-bottom:1rem">
+          <input type="text" id="newAmiId" placeholder="ID du nouvel ami" />
+          <button class="btn-success" onclick="ajouterAmi()">+ Ajouter ami</button>
+        </div>
+        <div id="amisDirectsResult"></div>
+      </div>
+    </div>
+
+    <div id="tab-amis-reco" class="tab-content" style="display:none">
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Suggestions (amis d'amis)</h3>
+        </div>
+        <div id="amisRecoResult"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PAGE NOUVEAU JOUEUR ── -->
+  <section id="page-nouveau" class="page">
+    <h2>➕ Créer un joueur</h2>
+
+    <div class="panel panel-form">
+      <h3>Nouveau joueur — créé dans les 3 bases simultanément</h3>
+      <div class="badges-info">
+        <span class="badge mongo">MongoDB</span>
+        <span class="badge redis">Redis</span>
+        <span class="badge neo4j">Neo4j</span>
+      </div>
+
+      <form onsubmit="creerJoueur(event)">
+        <div class="form-group">
+          <label>ID unique *</label>
+          <input type="text" id="newId" placeholder="ex: j11" required />
+          <small>Identifiant commun aux 3 bases</small>
+        </div>
+        <div class="form-group">
+          <label>Pseudo *</label>
+          <input type="text" id="newPseudo" placeholder="ex: Alice" required />
+        </div>
+        <div class="form-group">
+          <label>Niveau</label>
+          <input type="number" id="newNiveau" value="1" min="1" max="100" />
+        </div>
+        <div class="form-group">
+          <label>Score initial</label>
+          <input type="number" id="newScore" value="0" min="0" />
+        </div>
+        <button type="submit" class="btn-primary btn-large">🚀 Créer le joueur</button>
+      </form>
+
+      <div id="createResult"></div>
+    </div>
+
+    <!-- Ajouter des points -->
+    <div class="panel panel-form">
+      <h3>⚡ Ajouter des points à un joueur</h3>
+      <form onsubmit="ajouterPoints(event)">
+        <div class="form-group">
+          <label>ID du joueur</label>
+          <input type="text" id="pointsId" placeholder="ex: j1" required />
+        </div>
+        <div class="form-group">
+          <label>Points à ajouter</label>
+          <input type="number" id="pointsVal" value="100" required />
+          <small>Valeur négative pour retirer des points</small>
+        </div>
+        <button type="submit" class="btn-primary btn-large">Mettre à jour</button>
+      </form>
+      <div id="pointsResult"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══════════════ TOAST ═══════════════ -->
+<div id="toast"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
