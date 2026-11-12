@@ -1,242 +1,392 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🎮 Jeu en Ligne — NoSQL Dashboard</title>
+  <title>Arena — NoSQL Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
 
-<!-- ═══════════════ HEADER ═══════════════ -->
-<header>
-  <div class="header-inner">
-    <div class="logo">🎮 <span>Jeu en Ligne</span></div>
-    <div class="header-badges">
-      <span class="badge mongo">MongoDB</span>
-      <span class="badge redis">Redis</span>
-      <span class="badge neo4j">Neo4j</span>
-    </div>
-    <div class="status-bar" id="statusBar">
-      <span class="dot dot-ok" id="statusDot"></span>
-      <span id="statusText">Connexion...</span>
+  <!-- ═══════════════ SHELL ═══════════════ -->
+  <div class="shell">
+
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-mark">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <span class="brand-name">Arena</span>
+        </div>
+        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+          <i data-lucide="panel-left-close" class="icon-sm"></i>
+        </button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <span class="nav-section-label">Vue d'ensemble</span>
+          <button class="nav-item active" data-page="dashboard">
+            <i data-lucide="layout-dashboard" class="nav-icon"></i>
+            <span class="nav-label">Dashboard</span>
+          </button>
+        </div>
+        <div class="nav-section">
+          <span class="nav-section-label">Gestion</span>
+          <button class="nav-item" data-page="joueurs">
+            <i data-lucide="users" class="nav-icon"></i>
+            <span class="nav-label">Joueurs</span>
+          </button>
+          <button class="nav-item" data-page="classement">
+            <i data-lucide="trophy" class="nav-icon"></i>
+            <span class="nav-label">Classement</span>
+          </button>
+          <button class="nav-item" data-page="amis">
+            <i data-lucide="network" class="nav-icon"></i>
+            <span class="nav-label">Réseau</span>
+          </button>
+          <button class="nav-item" data-page="nouveau">
+            <i data-lucide="user-plus" class="nav-icon"></i>
+            <span class="nav-label">Nouveau joueur</span>
+          </button>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="system-status" id="sidebarStatus">
+          <span class="status-dot" id="statusDot"></span>
+          <span class="status-label" id="statusText">Vérification...</span>
+        </div>
+        <div class="db-stack">
+          <span class="db-tag db-mongo">Mongo</span>
+          <span class="db-tag db-redis">Redis</span>
+          <span class="db-tag db-neo4j">Neo4j</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── MAIN AREA ── -->
+    <div class="main-area">
+
+      <!-- Top bar -->
+      <header class="topbar">
+        <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open menu">
+          <i data-lucide="menu" class="icon-sm"></i>
+        </button>
+        <div class="topbar-title" id="topbarTitle">Dashboard</div>
+        <div class="topbar-actions">
+          <button class="icon-btn" onclick="refreshCurrent()" title="Actualiser">
+            <i data-lucide="refresh-cw" class="icon-sm"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Pages -->
+      <main class="content">
+
+        <!-- ── DASHBOARD ── -->
+        <section id="page-dashboard" class="page active">
+
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Dashboard</h1>
+              <p class="page-subtitle">Vue d'ensemble de la plateforme</p>
+            </div>
+          </div>
+
+          <div class="metrics-row">
+            <div class="metric">
+              <div class="metric-header">
+                <span class="metric-label">Joueurs total</span>
+                <div class="metric-icon metric-icon-blue">
+                  <i data-lucide="users" class="icon-xs"></i>
+                </div>
+              </div>
+              <div class="metric-value" id="statTotal">—</div>
+              <div class="metric-sub">enregistrés en base</div>
+            </div>
+            <div class="metric">
+              <div class="metric-header">
+                <span class="metric-label">Leader</span>
+                <div class="metric-icon metric-icon-amber">
+                  <i data-lucide="crown" class="icon-xs"></i>
+                </div>
+              </div>
+              <div class="metric-value" id="statLeader">—</div>
+              <div class="metric-sub">meilleur score</div>
+            </div>
+            <div class="metric">
+              <div class="metric-header">
+                <span class="metric-label">Score max</span>
+                <div class="metric-icon metric-icon-emerald">
+                  <i data-lucide="trending-up" class="icon-xs"></i>
+                </div>
+              </div>
+              <div class="metric-value" id="statTopScore">—</div>
+              <div class="metric-sub">points Redis</div>
+            </div>
+            <div class="metric">
+              <div class="metric-header">
+                <span class="metric-label">Classés</span>
+                <div class="metric-icon metric-icon-violet">
+                  <i data-lucide="bar-chart-2" class="icon-xs"></i>
+                </div>
+              </div>
+              <div class="metric-value" id="statClasses">—</div>
+              <div class="metric-sub">dans le sorted set</div>
+            </div>
+          </div>
+
+          <div class="section-header">
+            <h2 class="section-title">Top 10 Global</h2>
+            <button class="btn-ghost btn-sm" onclick="loadTop10()">
+              <i data-lucide="refresh-cw" class="icon-xs"></i>
+              Actualiser
+            </button>
+          </div>
+          <div id="top10Container">
+            <div class="skeleton-table"></div>
+          </div>
+
+        </section>
+
+        <!-- ── JOUEURS ── -->
+        <section id="page-joueurs" class="page">
+
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Joueurs</h1>
+              <p class="page-subtitle">Profils stockés dans MongoDB</p>
+            </div>
+            <button class="btn-primary" onclick="showPage('nouveau')">
+              <i data-lucide="user-plus" class="icon-xs"></i>
+              Nouveau joueur
+            </button>
+          </div>
+
+          <div class="toolbar">
+            <div class="search-field">
+              <i data-lucide="search" class="search-icon icon-xs"></i>
+              <input type="text" id="searchJoueur" placeholder="Rechercher par pseudo ou ID…" oninput="filterJoueurs()"/>
+            </div>
+            <button class="btn-ghost btn-sm" onclick="loadJoueurs()">
+              <i data-lucide="refresh-cw" class="icon-xs"></i>
+              Actualiser
+            </button>
+          </div>
+
+          <div id="joueursContainer">
+            <div class="skeleton-table"></div>
+          </div>
+
+          <!-- Drawer profil -->
+          <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+          <aside class="drawer" id="profilDrawer">
+            <div class="drawer-header">
+              <h3 class="drawer-title" id="profilTitre">Profil</h3>
+              <button class="icon-btn" onclick="closeDrawer()">
+                <i data-lucide="x" class="icon-sm"></i>
+              </button>
+            </div>
+            <div class="drawer-body" id="profilContent">
+              <div class="skeleton-block"></div>
+            </div>
+          </aside>
+
+        </section>
+
+        <!-- ── CLASSEMENT ── -->
+        <section id="page-classement" class="page">
+
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Classement</h1>
+              <p class="page-subtitle">Scores en temps réel via Redis Sorted Set</p>
+            </div>
+          </div>
+
+          <div class="tab-bar">
+            <button class="tab-pill active" data-tab="tab-global">Global</button>
+            <button class="tab-pill" data-tab="tab-amis-class">Entre amis</button>
+          </div>
+
+          <div id="tab-global" class="tab-pane active">
+            <div class="section-header" style="margin-top:0">
+              <h2 class="section-title">Top 10 Mondial</h2>
+              <button class="btn-ghost btn-sm" onclick="loadTop10Full()">
+                <i data-lucide="refresh-cw" class="icon-xs"></i>
+                Actualiser
+              </button>
+            </div>
+            <div id="top10Full"><div class="skeleton-table"></div></div>
+          </div>
+
+          <div id="tab-amis-class" class="tab-pane">
+            <div class="inline-form">
+              <div class="inline-form-label">
+                <i data-lucide="users" class="icon-xs"></i>
+                Classement entre amis d'un joueur
+              </div>
+              <div class="inline-form-controls">
+                <input type="text" id="classAmisId" placeholder="ID du joueur — ex: j1" class="input-inline"/>
+                <button class="btn-primary btn-sm" onclick="loadClassementAmis()">Afficher</button>
+              </div>
+            </div>
+            <div id="classAmisResult"></div>
+          </div>
+
+        </section>
+
+        <!-- ── AMIS / RÉSEAU ── -->
+        <section id="page-amis" class="page">
+
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Réseau</h1>
+              <p class="page-subtitle">Relations d'amitié stockées dans Neo4j</p>
+            </div>
+          </div>
+
+          <div class="inline-form">
+            <div class="inline-form-label">
+              <i data-lucide="search" class="icon-xs"></i>
+              Explorer le réseau d'un joueur
+            </div>
+            <div class="inline-form-controls">
+              <input type="text" id="amisJoueurId" placeholder="ID du joueur — ex: j1" class="input-inline"/>
+              <button class="btn-primary btn-sm" onclick="loadAmis()">Afficher</button>
+            </div>
+          </div>
+
+          <div id="amisTabs" style="display:none">
+            <div class="tab-bar">
+              <button class="tab-pill active" data-tab="tab-amis-directs">Amis directs</button>
+              <button class="tab-pill" data-tab="tab-amis-reco">Suggestions</button>
+            </div>
+
+            <div id="tab-amis-directs" class="tab-pane active">
+              <div class="section-header">
+                <h2 class="section-title" id="amisDirectsTitre">Amis directs</h2>
+                <div class="inline-form-controls">
+                  <input type="text" id="newAmiId" placeholder="ID du nouvel ami" class="input-inline"/>
+                  <button class="btn-primary btn-sm" onclick="ajouterAmi()">
+                    <i data-lucide="user-plus" class="icon-xs"></i>
+                    Ajouter
+                  </button>
+                </div>
+              </div>
+              <div id="amisDirectsResult"></div>
+            </div>
+
+            <div id="tab-amis-reco" class="tab-pane">
+              <div class="section-header">
+                <h2 class="section-title">Suggestions</h2>
+                <span class="badge-label">Traversal Neo4j — 2 degrés</span>
+              </div>
+              <div id="amisRecoResult"></div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- ── NOUVEAU JOUEUR ── -->
+        <section id="page-nouveau" class="page">
+
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Nouveau joueur</h1>
+              <p class="page-subtitle">Création simultanée dans les 3 bases de données</p>
+            </div>
+          </div>
+
+          <div class="form-layout">
+
+            <div class="form-panel">
+              <div class="form-panel-header">
+                <h3 class="form-panel-title">Créer un joueur</h3>
+                <div class="db-pill-row">
+                  <span class="db-pill db-pill-mongo">MongoDB</span>
+                  <span class="db-pill db-pill-redis">Redis</span>
+                  <span class="db-pill db-pill-neo4j">Neo4j</span>
+                </div>
+              </div>
+
+              <form onsubmit="creerJoueur(event)" class="form-body">
+                <div class="field-group">
+                  <label class="field-label" for="newId">Identifiant unique <span class="required">*</span></label>
+                  <input type="text" id="newId" class="field-input" placeholder="ex: j11" required autocomplete="off"/>
+                  <span class="field-hint">Clé commune aux 3 bases de données</span>
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="newPseudo">Pseudo <span class="required">*</span></label>
+                  <input type="text" id="newPseudo" class="field-input" placeholder="ex: Alice" required autocomplete="off"/>
+                </div>
+                <div class="field-row">
+                  <div class="field-group">
+                    <label class="field-label" for="newNiveau">Niveau initial</label>
+                    <input type="number" id="newNiveau" class="field-input" value="1" min="1" max="100"/>
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label" for="newScore">Score initial</label>
+                    <input type="number" id="newScore" class="field-input" value="0" min="0"/>
+                  </div>
+                </div>
+                <button type="submit" class="btn-primary btn-full">
+                  <i data-lucide="user-plus" class="icon-xs"></i>
+                  Créer le joueur
+                </button>
+              </form>
+              <div id="createResult"></div>
+            </div>
+
+            <div class="form-panel">
+              <div class="form-panel-header">
+                <h3 class="form-panel-title">Mettre à jour un score</h3>
+                <span class="db-pill db-pill-redis">Redis</span>
+              </div>
+
+              <form onsubmit="ajouterPoints(event)" class="form-body">
+                <div class="field-group">
+                  <label class="field-label" for="pointsId">ID du joueur</label>
+                  <input type="text" id="pointsId" class="field-input" placeholder="ex: j1" required autocomplete="off"/>
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="pointsVal">Points</label>
+                  <input type="number" id="pointsVal" class="field-input" value="100" required/>
+                  <span class="field-hint">Valeur négative pour retirer des points</span>
+                </div>
+                <button type="submit" class="btn-primary btn-full">
+                  <i data-lucide="zap" class="icon-xs"></i>
+                  Mettre à jour
+                </button>
+              </form>
+              <div id="pointsResult"></div>
+            </div>
+
+          </div>
+
+        </section>
+
+      </main>
     </div>
   </div>
-</header>
 
-<!-- ═══════════════ NAV ═══════════════ -->
-<nav>
-  <button class="nav-btn active" onclick="showPage('dashboard')">📊 Dashboard</button>
-  <button class="nav-btn" onclick="showPage('joueurs')">👤 Joueurs</button>
-  <button class="nav-btn" onclick="showPage('classement')">🏆 Classement</button>
-  <button class="nav-btn" onclick="showPage('amis')">👥 Amis</button>
-  <button class="nav-btn" onclick="showPage('nouveau')">➕ Nouveau joueur</button>
-</nav>
+  <!-- ═══════════════ TOAST ═══════════════ -->
+  <div class="toast" id="toast">
+    <i data-lucide="check-circle" class="icon-xs toast-icon" id="toastIcon"></i>
+    <span id="toastMsg"></span>
+  </div>
 
-<!-- ═══════════════ PAGES ═══════════════ -->
-<main>
-
-  <!-- ── PAGE DASHBOARD ── -->
-  <section id="page-dashboard" class="page active">
-    <h2>Dashboard</h2>
-
-    <!-- Stats cards -->
-    <div class="cards-grid">
-      <div class="card card-blue">
-        <div class="card-icon">👤</div>
-        <div class="card-value" id="statTotal">—</div>
-        <div class="card-label">Joueurs total</div>
-      </div>
-      <div class="card card-yellow">
-        <div class="card-icon">🏆</div>
-        <div class="card-value" id="statLeader">—</div>
-        <div class="card-label">Leader</div>
-      </div>
-      <div class="card card-green">
-        <div class="card-icon">⭐</div>
-        <div class="card-value" id="statTopScore">—</div>
-        <div class="card-label">Score max</div>
-      </div>
-      <div class="card card-purple">
-        <div class="card-icon">🔴</div>
-        <div class="card-value" id="statClasses">—</div>
-        <div class="card-label">Classés Redis</div>
-      </div>
-    </div>
-
-    <!-- Top 10 rapide -->
-    <div class="panel">
-      <div class="panel-header">
-        <h3>🏆 Top 10 Global</h3>
-        <button class="btn-refresh" onclick="loadTop10()">↻ Actualiser</button>
-      </div>
-      <div id="top10Container">
-        <div class="loading">Chargement...</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── PAGE JOUEURS ── -->
-  <section id="page-joueurs" class="page">
-    <h2>Joueurs</h2>
-
-    <div class="search-bar">
-      <input type="text" id="searchJoueur" placeholder="🔍 Rechercher un joueur..." oninput="filterJoueurs()"/>
-    </div>
-
-    <div class="panel">
-      <div class="panel-header">
-        <h3>Liste des joueurs</h3>
-        <button class="btn-refresh" onclick="loadJoueurs()">↻ Actualiser</button>
-      </div>
-      <div id="joueursContainer">
-        <div class="loading">Chargement...</div>
-      </div>
-    </div>
-
-    <!-- Profil détaillé -->
-    <div class="panel" id="profilPanel" style="display:none">
-      <div class="panel-header">
-        <h3 id="profilTitre">Profil</h3>
-        <button class="btn-close" onclick="closePanel('profilPanel')">✕</button>
-      </div>
-      <div id="profilContent"></div>
-    </div>
-  </section>
-
-  <!-- ── PAGE CLASSEMENT ── -->
-  <section id="page-classement" class="page">
-    <h2>🏆 Classement</h2>
-
-    <div class="tabs">
-      <button class="tab active" onclick="switchTab('tab-global', this)">Global</button>
-      <button class="tab" onclick="switchTab('tab-amis-class', this)">Entre amis</button>
-    </div>
-
-    <!-- Tab global -->
-    <div id="tab-global" class="tab-content active">
-      <div class="panel">
-        <div class="panel-header">
-          <h3>Top 10 Mondial</h3>
-          <button class="btn-refresh" onclick="loadTop10Full()">↻</button>
-        </div>
-        <div id="top10Full"><div class="loading">Chargement...</div></div>
-      </div>
-    </div>
-
-    <!-- Tab amis -->
-    <div id="tab-amis-class" class="tab-content">
-      <div class="panel">
-        <h3>Classement entre amis</h3>
-        <div class="form-row">
-          <input type="text" id="classAmisId" placeholder="ID du joueur (ex: j1)" />
-          <button class="btn-primary" onclick="loadClassementAmis()">Afficher</button>
-        </div>
-        <div id="classAmisResult"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── PAGE AMIS ── -->
-  <section id="page-amis" class="page">
-    <h2>👥 Réseau d'amis</h2>
-
-    <div class="panel">
-      <h3>Explorer les amis</h3>
-      <div class="form-row">
-        <input type="text" id="amisJoueurId" placeholder="ID du joueur (ex: j1)" />
-        <button class="btn-primary" onclick="loadAmis()">Afficher</button>
-      </div>
-    </div>
-
-    <div class="tabs" id="amisTabs" style="display:none">
-      <button class="tab active" onclick="switchTab('tab-amis-directs', this)">Amis directs</button>
-      <button class="tab" onclick="switchTab('tab-amis-reco', this)">Recommandations</button>
-    </div>
-
-    <div id="tab-amis-directs" class="tab-content active" style="display:none">
-      <div class="panel">
-        <div class="panel-header">
-          <h3 id="amisDirectsTitre">Amis directs</h3>
-        </div>
-        <div class="form-row" style="margin-bottom:1rem">
-          <input type="text" id="newAmiId" placeholder="ID du nouvel ami" />
-          <button class="btn-success" onclick="ajouterAmi()">+ Ajouter ami</button>
-        </div>
-        <div id="amisDirectsResult"></div>
-      </div>
-    </div>
-
-    <div id="tab-amis-reco" class="tab-content" style="display:none">
-      <div class="panel">
-        <div class="panel-header">
-          <h3>Suggestions (amis d'amis)</h3>
-        </div>
-        <div id="amisRecoResult"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── PAGE NOUVEAU JOUEUR ── -->
-  <section id="page-nouveau" class="page">
-    <h2>➕ Créer un joueur</h2>
-
-    <div class="panel panel-form">
-      <h3>Nouveau joueur — créé dans les 3 bases simultanément</h3>
-      <div class="badges-info">
-        <span class="badge mongo">MongoDB</span>
-        <span class="badge redis">Redis</span>
-        <span class="badge neo4j">Neo4j</span>
-      </div>
-
-      <form onsubmit="creerJoueur(event)">
-        <div class="form-group">
-          <label>ID unique *</label>
-          <input type="text" id="newId" placeholder="ex: j11" required />
-          <small>Identifiant commun aux 3 bases</small>
-        </div>
-        <div class="form-group">
-          <label>Pseudo *</label>
-          <input type="text" id="newPseudo" placeholder="ex: Alice" required />
-        </div>
-        <div class="form-group">
-          <label>Niveau</label>
-          <input type="number" id="newNiveau" value="1" min="1" max="100" />
-        </div>
-        <div class="form-group">
-          <label>Score initial</label>
-          <input type="number" id="newScore" value="0" min="0" />
-        </div>
-        <button type="submit" class="btn-primary btn-large">🚀 Créer le joueur</button>
-      </form>
-
-      <div id="createResult"></div>
-    </div>
-
-    <!-- Ajouter des points -->
-    <div class="panel panel-form">
-      <h3>⚡ Ajouter des points à un joueur</h3>
-      <form onsubmit="ajouterPoints(event)">
-        <div class="form-group">
-          <label>ID du joueur</label>
-          <input type="text" id="pointsId" placeholder="ex: j1" required />
-        </div>
-        <div class="form-group">
-          <label>Points à ajouter</label>
-          <input type="number" id="pointsVal" value="100" required />
-          <small>Valeur négative pour retirer des points</small>
-        </div>
-        <button type="submit" class="btn-primary btn-large">Mettre à jour</button>
-      </form>
-      <div id="pointsResult"></div>
-    </div>
-  </section>
-
-</main>
-
-<!-- ═══════════════ TOAST ═══════════════ -->
-<div id="toast"></div>
-
-<script src="/static/app.js"></script>
+  <script src="/static/app.js"></script>
+  <script>
+    // Init Lucide icons after DOM ready
+    lucide.createIcons();
+  </script>
 </body>
 </html>

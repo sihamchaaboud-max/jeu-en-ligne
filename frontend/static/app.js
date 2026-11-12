@@ -1,12 +1,16 @@
-/* ═══════════════════════════════════════════
-   JEU EN LIGNE — Frontend JavaScript
-   ═══════════════════════════════════════════ */
+/* =====================================================
+   ARENA — Application Logic
+   All API calls preserved. Only DOM rendering changed.
+   ===================================================== */
 
-const API = '';  // même domaine
+'use strict';
+
+const API = '';
 let _joueursCurrent = [];
 let _amisCurrentId  = null;
+let _currentPage    = 'dashboard';
 
-/* ── Utilitaires ── */
+/* ── API ── */
 async function api(path, opts = {}) {
   const r = await fetch(API + path, {
     headers: { 'Content-Type': 'application/json' },
@@ -19,200 +23,368 @@ async function api(path, opts = {}) {
   return r.json();
 }
 
+/* ── TOAST ── */
 function toast(msg, type = 'ok') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'show ' + type;
+  const t   = document.getElementById('toast');
+  const ico = document.getElementById('toastIcon');
+  const txt = document.getElementById('toastMsg');
+  txt.textContent = msg;
+  ico.setAttribute('data-lucide', type === 'ok' ? 'check-circle' : 'alert-circle');
+  t.className = 'toast show ' + type;
+  lucide.createIcons({ nodes: [ico] });
   clearTimeout(t._timer);
-  t._timer = setTimeout(() => { t.className = ''; }, 3500);
+  t._timer = setTimeout(() => { t.className = 'toast'; }, 3800);
 }
 
-function avatar(pseudo) {
-  return (pseudo || '?').substring(0, 2).toUpperCase();
+/* ── HELPERS ── */
+function initials(name) {
+  return (name || '?').substring(0, 2).toUpperCase();
 }
 
-function medalEmoji(rang) {
-  return rang === 1 ? '🥇' : rang === 2 ? '🥈' : rang === 3 ? '🥉' : '';
+function fmtScore(n) {
+  if (n == null) return '—';
+  return n.toLocaleString('fr-FR');
 }
 
-/* ── Navigation ── */
+function rankClass(r) {
+  if (r === 1) return 'rank-1';
+  if (r === 2) return 'rank-2';
+  if (r === 3) return 'rank-3';
+  return '';
+}
+
+function emptyState(msg, icon = 'inbox') {
+  return `<div class="state-empty">
+    <i data-lucide="${icon}" style="width:32px;height:32px;opacity:.25"></i>
+    <span class="state-empty-text">${msg}</span>
+  </div>`;
+}
+
+function errorState(msg) {
+  return `<div class="state-error">
+    <i data-lucide="alert-circle" class="icon-xs"></i>
+    ${msg}
+  </div>`;
+}
+
+function reinitIcons() {
+  lucide.createIcons();
+}
+
+/* ── NAVIGATION ── */
+const PAGE_TITLES = {
+  dashboard:  'Dashboard',
+  joueurs:    'Joueurs',
+  classement: 'Classement',
+  amis:       'Réseau',
+  nouveau:    'Nouveau joueur',
+};
+
 function showPage(name) {
+  _currentPage = name;
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('page-' + name).classList.add('active');
-  document.querySelectorAll('.nav-btn').forEach(b => {
-    if (b.getAttribute('onclick')?.includes(name)) b.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+
+  const page = document.getElementById('page-' + name);
+  if (page) page.classList.add('active');
+
+  document.querySelectorAll(`[data-page="${name}"]`).forEach(el => el.classList.add('active'));
+
+  const titleEl = document.getElementById('topbarTitle');
+  if (titleEl) titleEl.textContent = PAGE_TITLES[name] || name;
+
+  // Auto-load
+  if (name === 'dashboard')  { loadStats(); loadTop10(); }
+  if (name === 'joueurs')    { loadJoueurs(); }
+  if (name === 'classement') { loadTop10Full(); }
+
+  // Close mobile sidebar
+  document.getElementById('sidebar').classList.remove('mobile-open');
+}
+
+function refreshCurrent() {
+  showPage(_currentPage);
+}
+
+/* ── TAB SYSTEM ── */
+function initTabs(container) {
+  container.querySelectorAll('.tab-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.tab;
+      const bar    = btn.closest('.tab-bar');
+
+      bar.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // Find sibling panes
+      let el = bar.nextElementSibling;
+      while (el) {
+        if (el.classList.contains('tab-pane')) {
+          el.classList.toggle('active', el.id === target);
+        }
+        el = el.nextElementSibling;
+      }
+    });
   });
-
-  // Chargement automatique
-  if (name === 'dashboard') { loadStats(); loadTop10(); }
-  if (name === 'joueurs')   { loadJoueurs(); }
-  if (name === 'classement'){ loadTop10Full(); }
 }
 
-function switchTab(id, btn) {
-  const parent = btn.closest('.tabs').nextElementSibling;
-  // Désactiver tous les onglets du groupe
-  btn.closest('.tabs').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  // Trouver les contenus du même groupe
-  let el = btn.closest('.tabs').nextElementSibling;
-  while (el && el.classList.contains('tab-content')) {
-    el.classList.remove('active');
-    el = el.nextElementSibling;
-  }
-  document.getElementById(id).classList.add('active');
+/* ── SIDEBAR TOGGLE ── */
+document.getElementById('sidebarToggle').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+});
+
+document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.add('mobile-open');
+});
+
+/* ── NAV ITEMS ── */
+document.querySelectorAll('.nav-item[data-page]').forEach(btn => {
+  btn.addEventListener('click', () => showPage(btn.dataset.page));
+});
+
+/* ── ALL TAB BARS ── */
+document.querySelectorAll('.tab-bar').forEach(initTabs);
+
+/* ── DRAWER ── */
+function openDrawer() {
+  document.getElementById('profilDrawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
 
-function closePanel(id) {
-  document.getElementById(id).style.display = 'none';
+function closeDrawer() {
+  document.getElementById('profilDrawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+  document.body.style.overflow = '';
 }
 
-/* ── Status ── */
+// Legacy alias
+function closePanel() { closeDrawer(); }
+
+/* ── STATUS ── */
 async function checkStatus() {
+  const dot  = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
   try {
     await api('/api/stats');
-    document.getElementById('statusDot').className  = 'dot dot-ok';
-    document.getElementById('statusText').textContent = '3 bases connectées';
+    dot.className  = 'status-dot ok';
+    text.textContent = '3 bases connectées';
   } catch {
-    document.getElementById('statusDot').className  = 'dot dot-err';
-    document.getElementById('statusText').textContent = 'Erreur de connexion';
+    dot.className  = 'status-dot err';
+    text.textContent = 'Connexion échouée';
   }
 }
 
-/* ── Stats Dashboard ── */
+/* ── STATS ── */
 async function loadStats() {
   try {
-    const data = await api('/api/stats');
-    document.getElementById('statTotal').textContent   = data.joueurs_total;
-    document.getElementById('statClasses').textContent  = data.joueurs_classes;
-    if (data.leader) {
-      document.getElementById('statLeader').textContent   = data.leader.nom;
-      document.getElementById('statTopScore').textContent = data.leader.score.toLocaleString() + ' pts';
+    const d = await api('/api/stats');
+    document.getElementById('statTotal').textContent   = d.joueurs_total;
+    document.getElementById('statClasses').textContent = d.joueurs_classes;
+    if (d.leader) {
+      document.getElementById('statLeader').textContent   = d.leader.nom;
+      document.getElementById('statTopScore').textContent = fmtScore(d.leader.score);
     }
-  } catch (e) {
-    console.error('Stats error:', e);
-  }
+  } catch (e) { console.error('stats:', e); }
 }
 
-/* ── Top 10 (dashboard) ── */
+/* ── TOP 10 (dashboard) ── */
 async function loadTop10() {
   const c = document.getElementById('top10Container');
-  c.innerHTML = '<div class="loading">Chargement...</div>';
+  c.innerHTML = '<div class="skeleton-table"></div>';
   try {
     const top = await api('/api/top10');
-    if (!top.length) { c.innerHTML = '<div class="empty">Aucun joueur classé.</div>'; return; }
-    c.innerHTML = `
-      <table class="top10-table">
-        <thead><tr>
-          <th>Rang</th><th>Joueur</th><th>ID</th><th>Score</th>
-        </tr></thead>
+    if (!top.length) {
+      c.innerHTML = emptyState('Aucun joueur classé', 'trophy');
+      return;
+    }
+    c.innerHTML = `<div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:52px">#</th>
+            <th>Joueur</th>
+            <th>Identifiant</th>
+            <th style="text-align:right">Score</th>
+          </tr>
+        </thead>
         <tbody>
           ${top.map(e => `
           <tr>
-            <td><span class="rang-badge rang-${e.rang}">${medalEmoji(e.rang) || e.rang}</span></td>
-            <td><strong>${e.nom}</strong></td>
-            <td style="color:var(--text-muted)">${e.id}</td>
-            <td><span class="score-pill">${e.score.toLocaleString()} pts</span></td>
-          </tr>`).join('')}
-        </tbody>
-      </table>`;
-  } catch (e) {
-    c.innerHTML = `<div class="error">Erreur : ${e.message}</div>`;
-  }
-}
-
-/* ── Top 10 (page classement) ── */
-async function loadTop10Full() {
-  const c = document.getElementById('top10Full');
-  c.innerHTML = '<div class="loading">Chargement...</div>';
-  try {
-    const top = await api('/api/top10');
-    if (!top.length) { c.innerHTML = '<div class="empty">Aucun joueur classé.</div>'; return; }
-    c.innerHTML = `
-      <table class="top10-table">
-        <thead><tr>
-          <th>Rang</th><th>Joueur</th><th>ID</th><th>Score</th>
-        </tr></thead>
-        <tbody>
-          ${top.map(e => `
-          <tr>
-            <td><span class="rang-badge rang-${e.rang}">${medalEmoji(e.rang) || '#' + e.rang}</span></td>
+            <td><span class="rank-num ${rankClass(e.rang)}">${e.rang}</span></td>
             <td>
-              <div style="display:flex;align-items:center;gap:.6rem">
-                <div class="joueur-avatar" style="width:32px;height:32px;font-size:.8rem">${avatar(e.nom)}</div>
-                <strong>${e.nom}</strong>
+              <div class="player-cell">
+                <div class="avatar">${initials(e.nom)}</div>
+                <span class="player-name">${e.nom}</span>
               </div>
             </td>
-            <td style="color:var(--text-muted)">${e.id}</td>
-            <td><span class="score-pill">${e.score.toLocaleString()} pts</span></td>
+            <td><span class="player-id">${e.id}</span></td>
+            <td style="text-align:right">
+              <span class="score-value">${fmtScore(e.score)}</span>
+              <span class="score-unit">pts</span>
+            </td>
           </tr>`).join('')}
         </tbody>
-      </table>`;
+      </table>
+    </div>`;
+    reinitIcons();
   } catch (e) {
-    c.innerHTML = `<div class="error">Erreur : ${e.message}</div>`;
+    c.innerHTML = errorState(e.message);
+    reinitIcons();
   }
 }
 
-/* ── Classement entre amis ── */
+/* ── TOP 10 (classement page) ── */
+async function loadTop10Full() {
+  const c = document.getElementById('top10Full');
+  c.innerHTML = '<div class="skeleton-table"></div>';
+  try {
+    const top = await api('/api/top10');
+    if (!top.length) {
+      c.innerHTML = emptyState('Aucun joueur classé', 'trophy');
+      return;
+    }
+    c.innerHTML = `<div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:52px">Rang</th>
+            <th>Joueur</th>
+            <th>ID</th>
+            <th style="text-align:right">Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${top.map(e => `
+          <tr>
+            <td><span class="rank-num ${rankClass(e.rang)}">${e.rang}</span></td>
+            <td>
+              <div class="player-cell">
+                <div class="avatar">${initials(e.nom)}</div>
+                <span class="player-name">${e.nom}</span>
+              </div>
+            </td>
+            <td><span class="player-id">${e.id}</span></td>
+            <td style="text-align:right">
+              <span class="score-value">${fmtScore(e.score)}</span>
+              <span class="score-unit">pts</span>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+    reinitIcons();
+  } catch (e) {
+    c.innerHTML = errorState(e.message);
+    reinitIcons();
+  }
+}
+
+/* ── CLASSEMENT AMIS ── */
 async function loadClassementAmis() {
-  const id  = document.getElementById('classAmisId').value.trim();
-  const c   = document.getElementById('classAmisResult');
-  if (!id) { toast('Entrez un ID joueur', 'err'); return; }
-  c.innerHTML = '<div class="loading">Chargement...</div>';
+  const id = document.getElementById('classAmisId').value.trim();
+  const c  = document.getElementById('classAmisResult');
+  if (!id) { toast('Entrez un identifiant joueur', 'err'); return; }
+  c.innerHTML = '<div class="skeleton-table" style="margin-top:1rem;height:160px"></div>';
   try {
     const data = await api(`/api/classement-amis/${id}`);
-    if (!data.length) { c.innerHTML = '<div class="empty">Aucun ami classé.</div>'; return; }
-    c.innerHTML = `
-      <table class="top10-table" style="margin-top:1rem">
-        <thead><tr><th>Rang</th><th>Joueur</th><th>ID</th><th>Score</th></tr></thead>
+    if (!data.length) {
+      c.innerHTML = emptyState('Aucun ami classé pour ce joueur', 'users');
+      reinitIcons();
+      return;
+    }
+    c.innerHTML = `<div class="table-wrap" style="margin-top:var(--sp-5)">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:52px">Rang</th>
+            <th>Joueur</th>
+            <th>ID</th>
+            <th style="text-align:right">Score</th>
+          </tr>
+        </thead>
         <tbody>
           ${data.map(e => `
-          <tr style="${e.id === id ? 'background:rgba(99,102,241,.08)' : ''}">
-            <td><span class="rang-badge rang-${e.rang}">${e.rang}</span></td>
-            <td><strong>${e.nom}</strong> ${e.id === id ? '<span style="color:var(--green);font-size:.75rem"> ◄ toi</span>' : ''}</td>
-            <td style="color:var(--text-muted)">${e.id}</td>
-            <td><span class="score-pill">${e.score.toLocaleString()} pts</span></td>
+          <tr>
+            <td><span class="rank-num ${rankClass(e.rang)}">${e.rang}</span></td>
+            <td>
+              <div class="player-cell">
+                <div class="avatar">${initials(e.nom)}</div>
+                <span class="player-name">${e.nom}</span>
+                ${e.id === id ? '<span class="you-tag">vous</span>' : ''}
+              </div>
+            </td>
+            <td><span class="player-id">${e.id}</span></td>
+            <td style="text-align:right">
+              <span class="score-value">${fmtScore(e.score)}</span>
+              <span class="score-unit">pts</span>
+            </td>
           </tr>`).join('')}
         </tbody>
-      </table>`;
+      </table>
+    </div>`;
+    reinitIcons();
   } catch (e) {
-    c.innerHTML = `<div class="error">${e.message}</div>`;
+    c.innerHTML = errorState(e.message);
+    reinitIcons();
   }
 }
 
-/* ── Joueurs ── */
+/* ── JOUEURS ── */
 async function loadJoueurs() {
   const c = document.getElementById('joueursContainer');
-  c.innerHTML = '<div class="loading">Chargement...</div>';
+  c.innerHTML = '<div class="skeleton-table"></div>';
   try {
     _joueursCurrent = await api('/api/joueurs');
     renderJoueurs(_joueursCurrent);
   } catch (e) {
-    c.innerHTML = `<div class="error">Erreur : ${e.message}</div>`;
+    c.innerHTML = errorState(e.message);
+    reinitIcons();
   }
 }
 
 function renderJoueurs(list) {
   const c = document.getElementById('joueursContainer');
-  if (!list.length) { c.innerHTML = '<div class="empty">Aucun joueur trouvé.</div>'; return; }
-  c.innerHTML = `<div class="joueurs-grid">
-    ${list.map(j => `
-    <div class="joueur-card" onclick="showProfil('${j.id}')">
-      <div class="joueur-card-header">
-        <div>
-          <div class="joueur-card-name">${j.pseudo}</div>
-          <div class="joueur-card-id">ID: ${j.id}</div>
-        </div>
-        <div class="joueur-avatar">${avatar(j.pseudo)}</div>
-      </div>
-      <div class="joueur-card-stats">
-        <span>⚔️ Niv. ${j.niveau}</span>
-        <span>⭐ ${j.score?.toLocaleString() ?? '—'} pts</span>
-        ${j.rang ? `<span>🏆 #${j.rang}</span>` : ''}
-      </div>
-    </div>`).join('')}
+  if (!list.length) {
+    c.innerHTML = emptyState('Aucun joueur trouvé', 'users');
+    reinitIcons();
+    return;
+  }
+  c.innerHTML = `<div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Joueur</th>
+          <th>Identifiant</th>
+          <th>Niveau</th>
+          <th style="text-align:right">Score</th>
+          <th style="text-align:right">Rang</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${list.map(j => `
+        <tr class="player-row-action" onclick="showProfil('${j.id}')">
+          <td>
+            <div class="player-cell">
+              <div class="avatar">${initials(j.pseudo)}</div>
+              <span class="player-name">${j.pseudo}</span>
+            </div>
+          </td>
+          <td><span class="player-id">${j.id}</span></td>
+          <td><span class="player-id">${j.niveau}</span></td>
+          <td style="text-align:right">
+            <span class="score-value">${fmtScore(j.score)}</span>
+            <span class="score-unit">pts</span>
+          </td>
+          <td style="text-align:right">
+            ${j.rang ? `<span class="rank-num ${rankClass(j.rang)}">${j.rang}</span>` : '<span class="player-id">—</span>'}
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
   </div>`;
+  reinitIcons();
 }
 
 function filterJoueurs() {
@@ -222,68 +394,84 @@ function filterJoueurs() {
   ));
 }
 
+/* ── PROFIL (DRAWER) ── */
 async function showProfil(id) {
-  const panel = document.getElementById('profilPanel');
+  const title   = document.getElementById('profilTitre');
   const content = document.getElementById('profilContent');
-  const titre   = document.getElementById('profilTitre');
-  panel.style.display = 'block';
-  content.innerHTML = '<div class="loading">Chargement...</div>';
+
+  title.textContent = 'Chargement…';
+  content.innerHTML = '<div class="skeleton-block"></div>';
+  openDrawer();
+
   try {
     const j = await api(`/api/joueur/${id}`);
-    titre.textContent = `Profil — ${j.pseudo}`;
-    const inv = j.inventaire?.length
-      ? `<div class="inventory-list">${j.inventaire.map(e => `<span class="inventory-item">🎒 ${e.objet} x${e.qte}</span>`).join('')}</div>`
-      : '<span style="color:var(--text-muted)">Inventaire vide</span>';
+    title.textContent = j.pseudo;
+
+    const invHtml = j.inventaire?.length
+      ? j.inventaire.map(e => `<span class="tag">${e.objet} &times;${e.qte}</span>`).join('')
+      : '<span class="player-id">Inventaire vide</span>';
+
     const amisHtml = j.amis?.length
-      ? j.amis.map(a => `<span class="inventory-item">👤 ${a.pseudo}</span>`).join('')
-      : '<span style="color:var(--text-muted)">Aucun ami</span>';
+      ? j.amis.map(a => `<span class="tag">${a.pseudo}</span>`).join('')
+      : '<span class="player-id">Aucun ami</span>';
 
     content.innerHTML = `
-      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem">
-        <div class="joueur-avatar" style="width:56px;height:56px;font-size:1.3rem">${avatar(j.pseudo)}</div>
+      <div class="profil-hero">
+        <div class="profil-avatar">${initials(j.pseudo)}</div>
         <div>
-          <div style="font-size:1.3rem;font-weight:800">${j.pseudo}</div>
-          <div style="color:var(--text-muted)">ID : ${j.id}</div>
+          <div class="profil-name">${j.pseudo}</div>
+          <div class="profil-id">${j.id}</div>
         </div>
       </div>
 
-      <div class="profil-grid">
-        <div class="profil-stat">
-          <div class="profil-stat-val">Niv. ${j.niveau}</div>
-          <div class="profil-stat-label">Niveau (MongoDB)</div>
+      <div class="profil-stats-grid">
+        <div class="profil-stat-item">
+          <div class="profil-stat-value">${j.niveau}</div>
+          <div class="profil-stat-label">Niveau</div>
+          <div class="profil-stat-source">MongoDB</div>
         </div>
-        <div class="profil-stat">
-          <div class="profil-stat-val">${j.score?.toLocaleString() ?? '—'} pts</div>
-          <div class="profil-stat-label">Score (Redis)</div>
+        <div class="profil-stat-item">
+          <div class="profil-stat-value">${fmtScore(j.score)}</div>
+          <div class="profil-stat-label">Score</div>
+          <div class="profil-stat-source">Redis</div>
         </div>
-        <div class="profil-stat">
-          <div class="profil-stat-val">${j.rang ? '#' + j.rang : '—'}</div>
-          <div class="profil-stat-label">Rang mondial (Redis)</div>
+        <div class="profil-stat-item">
+          <div class="profil-stat-value">${j.rang ? '#' + j.rang : '—'}</div>
+          <div class="profil-stat-label">Rang mondial</div>
+          <div class="profil-stat-source">Redis</div>
         </div>
-        <div class="profil-stat">
-          <div class="profil-stat-val">${j.nb_amis}</div>
-          <div class="profil-stat-label">Amis (Neo4j)</div>
+        <div class="profil-stat-item">
+          <div class="profil-stat-value">${j.nb_amis}</div>
+          <div class="profil-stat-label">Amis</div>
+          <div class="profil-stat-source">Neo4j</div>
         </div>
       </div>
 
-      <div style="margin-top:1rem">
-        <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:1px">Inventaire (MongoDB)</div>
-        ${inv}
+      <div class="profil-section">
+        <div class="profil-section-title">Inventaire — MongoDB</div>
+        <div class="tag-list">${invHtml}</div>
       </div>
 
-      <div style="margin-top:1rem">
-        <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:1px">Amis (Neo4j)</div>
-        <div class="inventory-list">${amisHtml}</div>
+      <div class="profil-section">
+        <div class="profil-section-title">Amis — Neo4j</div>
+        <div class="tag-list">${amisHtml}</div>
       </div>
 
-      <div style="margin-top:1.5rem;display:flex;gap:.5rem;flex-wrap:wrap">
-        <button class="btn-primary" onclick="quickAddPoints('${j.id}')">⚡ +100 pts</button>
-        <button class="btn-danger"  onclick="quickDelete('${j.id}', '${j.pseudo}')">🗑 Supprimer</button>
+      <div class="profil-actions">
+        <button class="btn-primary btn-sm" onclick="quickAddPoints('${j.id}')">
+          <i data-lucide="zap" class="icon-xs"></i>
+          +100 pts
+        </button>
+        <button class="btn-danger" onclick="quickDelete('${j.id}', '${j.pseudo}')">
+          <i data-lucide="trash-2" class="icon-xs"></i>
+          Supprimer
+        </button>
       </div>`;
 
-    panel.scrollIntoView({ behavior: 'smooth' });
+    reinitIcons();
   } catch (e) {
-    content.innerHTML = `<div class="error">${e.message}</div>`;
+    content.innerHTML = errorState(e.message);
+    reinitIcons();
   }
 }
 
@@ -293,100 +481,140 @@ async function quickAddPoints(id) {
       method: 'PUT',
       body: JSON.stringify({ points: 100 }),
     });
-    toast(`✓ +100 pts → score ${r.nouveau_score} pts (rang #${r.rang})`);
+    toast(`Score mis à jour — ${fmtScore(r.nouveau_score)} pts · rang #${r.rang}`);
     showProfil(id);
     loadStats();
   } catch (e) { toast(e.message, 'err'); }
 }
 
 async function quickDelete(id, pseudo) {
-  if (!confirm(`Supprimer ${pseudo} des 3 bases ?`)) return;
+  if (!confirm(`Supprimer ${pseudo} des 3 bases de données ?`)) return;
   try {
     await api(`/api/joueur/${id}`, { method: 'DELETE' });
-    toast(`✓ ${pseudo} supprimé`);
-    closePanel('profilPanel');
+    toast(`${pseudo} supprimé`);
+    closeDrawer();
     loadJoueurs();
     loadStats();
   } catch (e) { toast(e.message, 'err'); }
 }
 
-/* ── Amis ── */
+/* ── RÉSEAU / AMIS ── */
 async function loadAmis() {
   const id = document.getElementById('amisJoueurId').value.trim();
-  if (!id) { toast('Entrez un ID joueur', 'err'); return; }
+  if (!id) { toast('Entrez un identifiant joueur', 'err'); return; }
   _amisCurrentId = id;
 
-  const tabs = document.getElementById('amisTabs');
-  const dirDiv = document.getElementById('tab-amis-directs');
-  const recoDiv = document.getElementById('tab-amis-reco');
-  tabs.style.display    = 'flex';
-  dirDiv.style.display  = 'block';
-  recoDiv.style.display = 'block';
+  const amisTabs = document.getElementById('amisTabs');
+  amisTabs.style.display = 'block';
 
-  // Charger les deux en parallèle
+  // init tabs on this container
+  amisTabs.querySelectorAll('.tab-bar').forEach(initTabs);
+
   loadAmisDirects(id);
   loadAmisReco(id);
 }
 
 async function loadAmisDirects(id) {
   const c = document.getElementById('amisDirectsResult');
-  document.getElementById('amisDirectsTitre').textContent = `Amis directs de ${id}`;
-  c.innerHTML = '<div class="loading">Chargement...</div>';
+  document.getElementById('amisDirectsTitre').textContent = `Amis de ${id}`;
+  c.innerHTML = '<div class="skeleton-table" style="height:120px"></div>';
   try {
     const amis = await api(`/api/amis/${id}`);
-    if (!amis.length) { c.innerHTML = '<div class="empty">Aucun ami pour le moment.</div>'; return; }
-    c.innerHTML = `<div class="amis-list">
-      ${amis.map(a => `
-      <div class="ami-row">
-        <div class="ami-info">
-          <div class="ami-avatar">${avatar(a.pseudo)}</div>
-          <div>
-            <div style="font-weight:600">${a.pseudo}</div>
-            <div style="font-size:.75rem;color:var(--text-muted)">${a.id} • ${a.score?.toLocaleString() ?? '—'} pts${a.rang ? ' • #' + a.rang : ''}</div>
-          </div>
-        </div>
-        <div class="ami-actions">
-          <button class="btn-danger" onclick="supprimerAmi('${id}', '${a.id}')">Retirer</button>
-        </div>
-      </div>`).join('')}
-    </div>`;
+    if (!amis.length) {
+      c.innerHTML = emptyState('Aucun ami pour le moment', 'user-x');
+      reinitIcons();
+      return;
+    }
+    c.innerHTML = `<div class="table-wrap"><table class="data-table">
+      <thead><tr>
+        <th>Joueur</th><th>ID</th>
+        <th style="text-align:right">Score</th>
+        <th style="text-align:right">Rang</th>
+        <th></th>
+      </tr></thead>
+      <tbody>
+        ${amis.map(a => `
+        <tr>
+          <td>
+            <div class="player-cell">
+              <div class="avatar">${initials(a.pseudo)}</div>
+              <span class="player-name">${a.pseudo}</span>
+            </div>
+          </td>
+          <td><span class="player-id">${a.id}</span></td>
+          <td style="text-align:right">
+            <span class="score-value">${fmtScore(a.score)}</span>
+            <span class="score-unit">pts</span>
+          </td>
+          <td style="text-align:right">
+            ${a.rang ? `<span class="rank-num ${rankClass(a.rang)}">${a.rang}</span>` : '<span class="player-id">—</span>'}
+          </td>
+          <td style="text-align:right">
+            <button class="btn-danger" onclick="supprimerAmi('${id}', '${a.id}')">
+              <i data-lucide="user-minus" class="icon-xs"></i>
+              Retirer
+            </button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+    reinitIcons();
   } catch (e) {
-    c.innerHTML = `<div class="error">${e.message}</div>`;
+    c.innerHTML = errorState(e.message);
+    reinitIcons();
   }
 }
 
 async function loadAmisReco(id) {
   const c = document.getElementById('amisRecoResult');
-  c.innerHTML = '<div class="loading">Chargement...</div>';
+  c.innerHTML = '<div class="skeleton-table" style="height:120px"></div>';
   try {
     const recs = await api(`/api/amis-damis/${id}`);
-    if (!recs.length) { c.innerHTML = '<div class="empty">Aucune suggestion disponible.</div>'; return; }
-    c.innerHTML = recs.map(r => `
-      <div class="reco-row">
-        <div class="ami-info">
-          <div class="ami-avatar" style="background:linear-gradient(135deg,var(--purple),var(--cyan))">${avatar(r.pseudo)}</div>
-          <div>
-            <div style="font-weight:600">${r.pseudo}</div>
-            <div style="font-size:.75rem;color:var(--text-muted)">${r.id}</div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:.5rem">
-          <span class="commun-badge">👥 ${r.amis_communs} en commun</span>
-          <button class="btn-success" style="font-size:.8rem;padding:.3rem .7rem" onclick="ajouterAmiDepuisReco('${id}', '${r.id}')">+ Ajouter</button>
-        </div>
-      </div>`).join('');
+    if (!recs.length) {
+      c.innerHTML = emptyState('Aucune suggestion disponible', 'users');
+      reinitIcons();
+      return;
+    }
+    c.innerHTML = `<div class="table-wrap"><table class="data-table">
+      <thead><tr>
+        <th>Joueur</th><th>ID</th>
+        <th>Amis en commun</th>
+        <th></th>
+      </tr></thead>
+      <tbody>
+        ${recs.map(r => `
+        <tr>
+          <td>
+            <div class="player-cell">
+              <div class="avatar">${initials(r.pseudo)}</div>
+              <span class="player-name">${r.pseudo}</span>
+            </div>
+          </td>
+          <td><span class="player-id">${r.id}</span></td>
+          <td><span class="mutual-tag">${r.amis_communs} en commun</span></td>
+          <td style="text-align:right">
+            <button class="btn-success" onclick="ajouterAmiDepuisReco('${id}', '${r.id}')">
+              <i data-lucide="user-plus" class="icon-xs"></i>
+              Ajouter
+            </button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+    reinitIcons();
   } catch (e) {
-    c.innerHTML = `<div class="error">${e.message}</div>`;
+    c.innerHTML = errorState(e.message);
+    reinitIcons();
   }
 }
 
 async function ajouterAmi() {
   const id  = _amisCurrentId;
   const ami = document.getElementById('newAmiId').value.trim();
-  if (!id || !ami) { toast('Entrez les deux IDs', 'err'); return; }
+  if (!id || !ami) { toast('Entrez les deux identifiants', 'err'); return; }
   try {
     const r = await api('/api/ami', { method: 'POST', body: JSON.stringify({ id_a: id, id_b: ami }) });
-    toast('✓ ' + r.message);
+    toast(r.message);
     document.getElementById('newAmiId').value = '';
     loadAmisDirects(id);
     loadAmisReco(id);
@@ -396,7 +624,7 @@ async function ajouterAmi() {
 async function ajouterAmiDepuisReco(id, ami) {
   try {
     const r = await api('/api/ami', { method: 'POST', body: JSON.stringify({ id_a: id, id_b: ami }) });
-    toast('✓ ' + r.message);
+    toast(r.message);
     loadAmisDirects(id);
     loadAmisReco(id);
   } catch (e) { toast(e.message, 'err'); }
@@ -405,55 +633,71 @@ async function ajouterAmiDepuisReco(id, ami) {
 async function supprimerAmi(id, ami) {
   try {
     await api('/api/ami', { method: 'DELETE', body: JSON.stringify({ id_a: id, id_b: ami }) });
-    toast('✓ Amitié supprimée');
+    toast('Amitié supprimée');
     loadAmisDirects(id);
     loadAmisReco(id);
   } catch (e) { toast(e.message, 'err'); }
 }
 
-/* ── Créer joueur ── */
+/* ── CRÉER JOUEUR ── */
 async function creerJoueur(e) {
   e.preventDefault();
   const result = document.getElementById('createResult');
+  const btn    = e.target.querySelector('button[type="submit"]');
   const data = {
     id:     document.getElementById('newId').value.trim(),
     pseudo: document.getElementById('newPseudo').value.trim(),
     niveau: parseInt(document.getElementById('newNiveau').value) || 1,
     score:  parseInt(document.getElementById('newScore').value)  || 0,
   };
-  result.innerHTML = '<div class="loading">Création en cours...</div>';
+  result.innerHTML = '';
+  btn.disabled = true;
   try {
     const r = await api('/api/joueur', { method: 'POST', body: JSON.stringify(data) });
-    result.innerHTML = `<div class="success">✅ ${r.message}</div>`;
-    toast('✓ Joueur créé dans les 3 bases !');
+    result.innerHTML = `<div class="state-success"><i data-lucide="check-circle" class="icon-xs"></i>${r.message}</div>`;
+    toast('Joueur créé dans les 3 bases');
     e.target.reset();
     document.getElementById('newNiveau').value = '1';
     document.getElementById('newScore').value  = '0';
     loadStats();
+    reinitIcons();
   } catch (err) {
-    result.innerHTML = `<div class="error">✗ ${err.message}</div>`;
+    result.innerHTML = `<div class="state-error"><i data-lucide="alert-circle" class="icon-xs"></i>${err.message}</div>`;
     toast(err.message, 'err');
+    reinitIcons();
+  } finally {
+    btn.disabled = false;
   }
 }
 
-/* ── Ajouter points ── */
+/* ── AJOUTER POINTS ── */
 async function ajouterPoints(e) {
   e.preventDefault();
-  const id  = document.getElementById('pointsId').value.trim();
-  const pts = parseInt(document.getElementById('pointsVal').value);
+  const id     = document.getElementById('pointsId').value.trim();
+  const pts    = parseInt(document.getElementById('pointsVal').value);
   const result = document.getElementById('pointsResult');
+  const btn    = e.target.querySelector('button[type="submit"]');
+  result.innerHTML = '';
+  btn.disabled = true;
   try {
     const r = await api(`/api/score/${id}`, { method: 'PUT', body: JSON.stringify({ points: pts }) });
-    result.innerHTML = `<div class="success">✅ Nouveau score : <strong>${r.nouveau_score.toLocaleString()} pts</strong> — Rang #${r.rang}</div>`;
-    toast(`✓ Score mis à jour → ${r.nouveau_score} pts`);
+    result.innerHTML = `<div class="state-success">
+      <i data-lucide="check-circle" class="icon-xs"></i>
+      Nouveau score : <strong>${fmtScore(r.nouveau_score)} pts</strong> — rang #${r.rang}
+    </div>`;
+    toast(`Score mis à jour — ${fmtScore(r.nouveau_score)} pts`);
     loadStats();
+    reinitIcons();
   } catch (err) {
-    result.innerHTML = `<div class="error">✗ ${err.message}</div>`;
+    result.innerHTML = `<div class="state-error"><i data-lucide="alert-circle" class="icon-xs"></i>${err.message}</div>`;
     toast(err.message, 'err');
+    reinitIcons();
+  } finally {
+    btn.disabled = false;
   }
 }
 
-/* ── Init ── */
+/* ── BOOT ── */
 checkStatus();
 showPage('dashboard');
-setInterval(checkStatus, 30000);
+setInterval(checkStatus, 30_000);
