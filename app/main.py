@@ -15,6 +15,7 @@ Lancer avec :  python -m app.main
 
 from app.joueur_service import JoueurService
 from app.services import neo4j_service as neo4j
+from app.services import mongo_service as mongo
 
 
 def afficher_separateur(titre: str):
@@ -67,7 +68,7 @@ def action_voir_profil(service: JoueurService):
     """Affiche le profil d'un joueur."""
     joueur_id = input("ID du joueur : ").strip()
 
-    profil = service.mongo.get_profil(joueur_id)
+    profil = mongo.get_profil(joueur_id)
     if not profil:
         print(f"\n✗ Aucun profil trouvé pour '{joueur_id}'.")
         return
@@ -75,12 +76,12 @@ def action_voir_profil(service: JoueurService):
     score = service.redis.get_score(joueur_id)
     rang = service.redis.get_rang(joueur_id)
 
-    print(f"\n--- Profil de {profil.get('nom', '?')} ---")
-    print(f"  ID      : {profil['_id']}")
-    print(f"  Niveau  : {profil.get('niveau', '?')}")
-    print(f"  XP      : {profil.get('xp', 0)}")
-    print(f"  Score   : {score if score is not None else 'Non classé'}")
-    print(f"  Rang    : {rang if rang is not None else 'N/A'}")
+    print(f"\n--- Profil de {profil.get('pseudo', '?')} ---")
+    print(f"  ID           : {profil['_id']}")
+    print(f"  Niveau       : {profil.get('niveau', '?')}")
+    print(f"  Inventaire   : {profil.get('inventaire', [])}")
+    print(f"  Score        : {score if score is not None else 'Non classé'}")
+    print(f"  Rang global  : {rang if rang is not None else 'N/A'}")
 
 
 def action_update_score(service: JoueurService):
@@ -158,25 +159,26 @@ def action_voir_inventaire(service: JoueurService):
     """Affiche l'inventaire d'un joueur."""
     joueur_id = input("ID du joueur : ").strip()
 
-    inventaire = service.mongo.get_inventaire(joueur_id)
+    profil = mongo.get_profil(joueur_id)
+    inventaire = profil["inventaire"] if profil else []
 
     if not inventaire:
         print(f"\nInventaire de '{joueur_id}' vide ou inexistant.")
         return
 
     print(f"\n--- INVENTAIRE DE {joueur_id} ---")
-    for item, quantite in inventaire.items():
-        print(f"  {item:<20} x{quantite}")
+    for entry in inventaire:
+        print(f"  {entry['objet']:<20} x{entry['qte']}")
 
 
 def action_ajouter_item(service: JoueurService):
     """Ajoute un item à l'inventaire d'un joueur."""
     joueur_id = input("ID du joueur : ").strip()
-    item = input("Nom de l'item : ").strip()
+    objet = input("Nom de l'objet : ").strip()
     quantite = input("Quantité (défaut 1) : ").strip() or "1"
 
-    service.mongo.ajouter_item(joueur_id, item, int(quantite))
-    print(f"\n✓ {quantite}x '{item}' ajouté à l'inventaire de '{joueur_id}'.")
+    mongo.ajouter_objet(joueur_id, objet, int(quantite))
+    print(f"\n✓ {quantite}x '{objet}' ajouté à l'inventaire de '{joueur_id}'.")
 
 
 def action_supprimer_joueur(service: JoueurService):
@@ -190,7 +192,6 @@ def action_supprimer_joueur(service: JoueurService):
 
     service.supprimer_joueur(joueur_id)
     print(f"\n✓ Joueur '{joueur_id}' supprimé des 3 bases.")
-
 
 def action_nombre_joueurs(service: JoueurService):
     """Affiche le nombre total de joueurs classés."""

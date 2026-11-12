@@ -1,25 +1,20 @@
 """
 JoueurService - Intégration (Oussama)
 
-Ce module orchestre les trois services (Mongo, Redis, Neo4j)
-pour offrir une logique métier unifiée :
+Orchestre les trois services (Mongo, Redis, Neo4j) :
+  - creer_joueur()        : crée dans les 3 bases simultanément
+  - get_top_10_global()   : Top 10 mondial (Redis + MongoDB)
+  - get_classement_amis() : classement entre amis (Neo4j + Redis + MongoDB)
+  - supprimer_joueur()    : supprime des 3 bases
 
-  - creer_joueur()       : crée un joueur dans les 3 bases
-  - get_top_10_global()  : Top 10 des scores mondiaux
-  - get_classement_amis(): classement limité aux amis + le joueur
-  - supprimer_joueur()   : supprime des 3 bases
-
-C'est le point d'entrée unique pour les opérations qui touchent
-plusieurs bases de données simultanément.
-
-Dépendances :
-  - mongo_service  : style classe  (MongoService)
-  - redis_service  : style classe  (RedisService)
-  - neo4j_service  : style fonctionnel (fonctions directes — Salma)
+Styles des services partenaires :
+  - mongo_service  : fonctionnel (Siham)   — fonctions directes
+  - redis_service  : classe     (Oussama)  — RedisService
+  - neo4j_service  : fonctionnel (Salma)   — fonctions directes
 """
 
-from app.services.mongo_service import MongoService
 from app.services.redis_service import RedisService
+from app.services import mongo_service as mongo
 from app.services import neo4j_service as neo4j
 
 
@@ -27,14 +22,10 @@ class JoueurService:
     """Couche d'intégration : coordonne Mongo, Redis et Neo4j."""
 
     def __init__(self):
-        """Initialise les connexions aux trois bases."""
-        self.mongo = MongoService()
         self.redis = RedisService()
-        # Neo4j utilise un driver module-level (style fonctionnel de Salma)
         neo4j.initialiser_schema()
 
     def close(self):
-        """Ferme les connexions ouvertes."""
         neo4j.fermer()
 
     # ==================================================
@@ -49,24 +40,19 @@ class JoueurService:
         score_initial: int = 0,
     ) -> None:
         """
-        Crée un joueur complet dans les trois bases :
-          1. MongoDB : profil + inventaire vide
-          2. Redis   : score initial dans le classement
+        Crée un joueur dans les 3 bases :
+          1. MongoDB : profil (pseudo, niveau, inventaire vide)
+          2. Redis   : score initial dans le classement global
           3. Neo4j   : noeud Joueur dans le graphe
 
         Args:
-            joueur_id:     identifiant unique du joueur
-            nom:           nom affiché
+            joueur_id:     identifiant unique (commun aux 3 bases)
+            nom:           pseudo affiché
             niveau:        niveau de départ
             score_initial: score de départ (0 par défaut)
         """
-        # 1. MongoDB : profil
-        self.mongo.creer_profil(joueur_id, nom, niveau)
-
-        # 2. Redis : score
+        mongo.creer_profil(joueur_id, nom, niveau)
         self.redis.set_score(joueur_id, score_initial)
-
-        # 3. Neo4j : noeud (pseudo = même valeur que nom)
         neo4j.creer_noeud(joueur_id, nom)
 
     # ==================================================
@@ -75,21 +61,16 @@ class JoueurService:
 
     def get_top_10_global(self) -> list[dict]:
         """
-        Récupère le Top 10 mondial des joueurs par score.
-        Combine Redis (scores) et MongoDB (noms des joueurs).
+        Top 10 mondial par score décroissant.
+        Combine Redis (scores triés) + MongoDB (pseudos).
 
         Returns:
-            Liste de dictionnaires triés par rang :
-            {"rang": int, "id": str, "nom": str, "score": int}
+            [{"rang": int, "id": str, "nom": str, "score": int}, ...]
         """
-        top_scores = self.redis.get_top_10()
-
         resultats = []
-        for i, (joueur_id, score) in enumerate(top_scores):
-            nom = self.mongo.get_nom(joueur_id) or "Inconnu"
-            resultats.append(
-                {"rang": i + 1, "id": joueur_id, "nom": nom, "score": score}
-            )
+        for i, (joueur_id, score) in enumerate(self.redis.get_top_10()):
+            nom = mongo.get_pseudo(joueur_id) or "Inconnu"
+            resultats.append({"rang": i + 1, "id": joueur_id, "nom": nom, "score": score})
         return resultats
 
     # ==================================================
@@ -98,39 +79,24 @@ class JoueurService:
 
     def get_classement_amis(self, joueur_id: str) -> list[dict]:
         """
-        Classement limité aux amis du joueur + le joueur lui-même.
-        Combine Neo4j (liste d'amis) et Redis (scores).
+        Classement limité aux amis du joueur + lui-même.
 
         Étapes :
-          1. Récupérer les IDs des amis directs depuis Neo4j
-          2. Ajouter le joueur lui-même à la liste
-          3. Demander à Redis les scores de tous ces joueurs
-          4. Enrichir avec les noms depuis MongoDB
-
-        Args:
-            joueur_id: identifiant du joueur
+          1. Neo4j  → IDs des amis directs
+          2. Redis  → scores triés de cette liste
+          3. MongoDB → pseudos pour affichage
 
         Returns:
-            Liste de dictionnaires triés par rang :
-            {"rang": int, "id": str, "nom": str, "score": int}
+            [{"rang": int, "id": str, "nom": str, "score": int}, ...]
         """
-        # 1. IDs des amis depuis Neo4j (fonction dédiée de Salma)
-        ids_a_classer = neo4j.get_ids_amis(joueur_id)
+        ids = neo4j.get_ids_amis(joueur_id)
+        if joueur_id not in ids:
+            ids.append(joueur_id)
 
-        # 2. Ajouter le joueur lui-même
-        if joueur_id not in ids_a_classer:
-            ids_a_classer.append(joueur_id)
-
-        # 3. Scores depuis Redis (triés par score décroissant)
-        scores_tries = self.redis.get_scores_pour_ids(ids_a_classer)
-
-        # 4. Enrichir avec les noms depuis MongoDB
         resultats = []
-        for i, (pid, score) in enumerate(scores_tries):
-            nom = self.mongo.get_nom(pid) or "Inconnu"
-            resultats.append(
-                {"rang": i + 1, "id": pid, "nom": nom, "score": score}
-            )
+        for i, (pid, score) in enumerate(self.redis.get_scores_pour_ids(ids)):
+            nom = mongo.get_pseudo(pid) or "Inconnu"
+            resultats.append({"rang": i + 1, "id": pid, "nom": nom, "score": score})
         return resultats
 
     # ==================================================
@@ -138,7 +104,7 @@ class JoueurService:
     # ==================================================
 
     def supprimer_joueur(self, joueur_id: str) -> None:
-        """Supprime un joueur des trois bases."""
-        self.mongo.supprimer_joueur(joueur_id)
+        """Supprime un joueur des 3 bases."""
+        mongo.supprimer_profil(joueur_id)
         self.redis.delete_score(joueur_id)
         neo4j.supprimer_noeud(joueur_id)

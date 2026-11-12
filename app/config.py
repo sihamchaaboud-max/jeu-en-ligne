@@ -3,15 +3,14 @@ Configuration centrale du projet.
 
 Lit les variables d'environnement depuis le fichier .env
 pour les connexions aux trois bases de données :
-  - MongoDB  (profils + inventaires)
-  - Redis    (scores + classements)
-  - Neo4j    (amis + amis d'amis)
+  - MongoDB  (Siham  : profils + inventaires)
+  - Redis    (Oussama: scores + classements)
+  - Neo4j    (Salma  : amis + amis d'amis)
 """
 
 import os
 from dotenv import load_dotenv
 
-# Charge le fichier .env situé à la racine du projet
 load_dotenv()
 
 # --------------------------------------------------

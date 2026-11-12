@@ -1,9 +1,5 @@
-version: "3.8"
-
 services:
-  # -------------------------------------------
-  # MongoDB - Profils joueurs + inventaires
-  # -------------------------------------------
+  # MongoDB - Profils joueurs + inventaires (Siham)
   mongodb:
     image: mongo:7
     container_name: jeu_mongodb
@@ -13,9 +9,7 @@ services:
       - mongo_data:/data/db
     restart: unless-stopped
 
-  # -------------------------------------------
-  # Redis - Scores + classements
-  # -------------------------------------------
+  # Redis - Scores + classements (Oussama)
   redis:
     image: redis:7-alpine
     container_name: jeu_redis
@@ -25,15 +19,13 @@ services:
       - redis_data:/data
     restart: unless-stopped
 
-  # -------------------------------------------
-  # Neo4j - Relations d'amitié
-  # -------------------------------------------
+  # Neo4j - Relations d'amitié (Salma)
   neo4j:
     image: neo4j:5
     container_name: jeu_neo4j
     ports:
-      - "7474:7474"   # interface web
-      - "7687:7687"   # Bolt
+      - "7474:7474"
+      - "7687:7687"
     environment:
       - NEO4J_AUTH=neo4j/password123
     volumes:
