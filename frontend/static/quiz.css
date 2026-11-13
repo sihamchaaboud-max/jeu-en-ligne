@@ -1,0 +1,72 @@
+/* =====================================================
+   Quiz de calcul mental
+   Utilise les variables de style.css (--surface-*, --accent, ...)
+   ===================================================== */
+
+.quiz-hidden { display: none !important; }
+
+.quiz-panel-debut { max-width: 520px; }
+
+.quiz-erreur {
+  padding: 0 var(--sp-6) var(--sp-5);
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+.quiz-erreur:empty { padding: 0; }
+
+.quiz-question {
+  margin: var(--sp-2) 0 var(--sp-6);
+  text-align: center;
+  font-size: 3rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.quiz-chrono {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--r-md);
+  background: var(--surface-4);
+}
+.quiz-barre {
+  width: 100%;
+  height: 100%;
+  background: var(--accent);
+}
+.quiz-barre.urgent { background: var(--warning); }
+
+.quiz-reponse-form {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-5);
+}
+.quiz-reponse-form .field-input {
+  flex: 1;
+  text-align: center;
+  font-size: var(--text-lg);
+}
+
+.quiz-retour {
+  min-height: 1.6em;
+  margin-top: var(--sp-4);
+  text-align: center;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+.quiz-retour.ok { color: var(--success); }
+.quiz-retour.ko { color: var(--danger); }
+
+.quiz-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+/* L'écran de fin n'a que 3 cartes : on garde 3 colonnes */
+#quizFin .metrics-row { grid-template-columns: repeat(3, 1fr); }
+
+@media (max-width: 768px) {
+  #quizFin .metrics-row { grid-template-columns: 1fr; }
+  .quiz-question { font-size: 2.2rem; }
+}
