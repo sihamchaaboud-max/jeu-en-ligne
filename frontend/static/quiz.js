@@ -5,6 +5,7 @@
 
   let partieId = null;
   let joueurCourant = "";
+  let tokenCourant = null;
   let nbQuestions = 10;
   let tempsLimite = 10;
   let debutQuestion = 0;
@@ -29,9 +30,11 @@
   }
 
   async function appelerApi(url, donnees) {
+    const headers = { "Content-Type": "application/json" };
+    if (tokenCourant) headers["Authorization"] = "Bearer " + tokenCourant;
     const options = {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(donnees),
     };
     const reponse = await fetch(url, options);
@@ -44,15 +47,38 @@
 
 
   // ─────────────────────────────────────────────
+  // Connexion (si le joueur a un mot de passe)
+  // ─────────────────────────────────────────────
+  async function connecter(joueurId, motDePasse) {
+    tokenCourant = null;
+    if (!motDePasse) return;   // pas de mot de passe saisi : on tente en mode héritage
+
+    const reponse = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ joueur_id: joueurId, mot_de_passe: motDePasse }),
+    });
+    const json = await reponse.json();
+    if (!reponse.ok) {
+      throw new Error(json.detail || "Connexion impossible");
+    }
+    if (json.sans_mot_de_passe) return;   // joueur du seed sans mot de passe
+    tokenCourant = json.token;
+  }
+
+
+  // ─────────────────────────────────────────────
   // Début de partie
   // ─────────────────────────────────────────────
   async function commencer(evenement) {
     evenement.preventDefault();
     const joueurId = $("quizJoueurId").value.trim();
+    const motDePasse = $("quizMdp").value;
     if (!joueurId) return;
     afficherErreur("");
 
     try {
+      await connecter(joueurId, motDePasse);
       const d = await appelerApi("/api/quiz/start", { joueur_id: joueurId });
       joueurCourant = joueurId;
       partieId = d.partie_id;

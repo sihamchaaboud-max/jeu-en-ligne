@@ -13,11 +13,19 @@ La clé "classement_global" est un sorted set où :
 Redis trie automatiquement les membres par score croissant.
 """
 
+import json
+
 import redis
-from app.config import REDIS_URL
+from app.config import QUIZ_PARTIE_TTL, REDIS_URL
 
 # Clé du sorted set global contenant tous les scores
 CLE_CLASSEMENT_GLOBAL = "classement_global"
+
+# Sessions de quiz : quiz:partie:<partie_id> -> état JSON de la partie
+PREFIXE_PARTIE = "quiz:partie:"
+
+# Canal pub/sub notifiant chaque changement de score (WebSocket Top 10)
+CANAL_SCORES = "canal:scores"
 
 
 class RedisService:
@@ -132,6 +140,47 @@ class RedisService:
         # Tri par score décroissant
         classement.sort(key=lambda x: x[1], reverse=True)
         return classement
+
+    # ==================================================
+    # Sessions de quiz (état stocké dans Redis, pas en mémoire)
+    # ==================================================
+
+    def sauver_partie(self, partie_id: str, etat: dict, ttl: int = None) -> None:
+        """Stocke l'état d'une partie de quiz avec une durée de vie.
+
+        Args:
+            partie_id: identifiant de la partie
+            etat:      Partie.to_dict()
+            ttl:       expiration en secondes (défaut : QUIZ_PARTIE_TTL)
+        """
+        self.client.set(
+            PREFIXE_PARTIE + partie_id,
+            json.dumps(etat),
+            ex=ttl or QUIZ_PARTIE_TTL,
+        )
+
+    def charger_partie(self, partie_id: str) -> dict | None:
+        """Lit l'état d'une partie, ou None si inexistante ou expirée."""
+        brut = self.client.get(PREFIXE_PARTIE + partie_id)
+        return json.loads(brut) if brut else None
+
+    def supprimer_partie(self, partie_id: str) -> None:
+        """Supprime la session d'une partie terminée ou abandonnée."""
+        self.client.delete(PREFIXE_PARTIE + partie_id)
+
+    # ==================================================
+    # Diffusion des changements de score (WebSocket Top 10)
+    # ==================================================
+
+    def publier_maj_scores(self) -> None:
+        """Publie sur le canal scores : les clients WebSocket rechargeront le Top 10."""
+        self.client.publish(CANAL_SCORES, "maj")
+
+    def souscrire_scores(self):
+        """Abonnement au canal scores (utilisé par le diffuseur WebSocket)."""
+        pubsub = self.client.pubsub(ignore_subscribe_messages=True)
+        pubsub.subscribe(CANAL_SCORES)
+        return pubsub
 
     # ==================================================
     # Nettoyage

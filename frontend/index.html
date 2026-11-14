@@ -342,6 +342,11 @@
                     <input type="number" id="newScore" class="field-input" value="0" min="0"/>
                   </div>
                 </div>
+                <div class="field-group">
+                  <label class="field-label" for="newMdp">Mot de passe <span class="player-id">(optionnel)</span></label>
+                  <input type="password" id="newMdp" class="field-input" placeholder="protège son score de quiz" autocomplete="off"/>
+                  <span class="field-hint">Si défini, le joueur devra se connecter pour jouer au quiz</span>
+                </div>
                 <button type="submit" class="btn-primary btn-full">
                   <i data-lucide="user-plus" class="icon-xs"></i>
                   Créer le joueur
@@ -400,6 +405,11 @@
                   <input id="quizJoueurId" class="field-input" type="text"
                          placeholder="ex : j1" autocomplete="off" required>
                   <span class="field-hint">Ton score final est ajouté au classement Redis</span>
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="quizMdp">Mot de passe</label>
+                  <input id="quizMdp" class="field-input" type="password"
+                         placeholder="si tu en as défini un" autocomplete="off">
                 </div>
                 <button type="submit" class="btn-primary btn-full">
                   <i data-lucide="play" class="icon-xs"></i>

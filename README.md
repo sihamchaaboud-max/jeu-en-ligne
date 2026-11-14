@@ -1,8 +1,10 @@
 # Jeu en Ligne
 
+[![CI](https://github.com/sihamchaaboud-max/jeu-en-ligne/actions/workflows/ci.yml/badge.svg)](https://github.com/sihamchaaboud-max/jeu-en-ligne/actions/workflows/ci.yml)
+
 Projet de jeu en ligne multi-joueurs utilisant trois bases de données NoSQL :
-- **MongoDB** : profils des joueurs et inventaires
-- **Redis** : scores et classements (Top 10 global, classement entre amis)
+- **MongoDB** : profils des joueurs et inventaires (+ mots de passe hashés)
+- **Redis** : scores et classements (Top 10 global, classement entre amis), **sessions de quiz**
 - **Neo4j** : relations d'amitié et recommandations (amis d'amis)
 
 ## Répartition du travail
@@ -75,6 +77,39 @@ python -m scripts.seed_data
 Crée 10 joueurs avec des scores et un réseau d'amitiés.
 
 ## Utilisation
+
+### Tout-en-un avec Docker (recommandé)
+
+```bash
+docker compose up -d --build
+```
+
+Lance les 3 bases de données **et l'API** : http://localhost:8000 (dashboard), http://localhost:8000/docs (Swagger). L'API démarre dès que les bases sont prêtes (healthchecks + attente au démarrage).
+
+### Ou en développement local
+
+```bash
+docker compose up -d mongodb redis neo4j   # bases seulement
+pip install -r requirements.txt
+python -m uvicorn app.api:app --reload --port 8000
+```
+
+### API web
+
+- **Dashboard** : http://localhost:8000 — joueurs, classement, réseau d'amis, quiz
+- **WebSocket** `ws://localhost:8000/ws/top10` : le Top 10 se met à jour en direct à chaque changement de score
+
+### Authentification (quiz)
+
+Les joueurs créés via le dashboard peuvent avoir un mot de passe (champ optionnel) :
+- avec mot de passe → connexion obligatoire pour jouer au quiz (`POST /api/auth/login` → token JWT)
+- sans mot de passe (joueurs du seed, données de test) → jeu direct (mode héritage)
+
+Endpoints : `POST /api/auth/mot-de-passe` (définir/changer), `POST /api/auth/login` (token JWT HS256, 12 h). Les mots de passe sont hashés en PBKDF2-SHA256 + sel, stockés dans MongoDB.
+
+### Quiz de calcul mental
+
+10 questions, 10 secondes chacune, points selon la rapidité (jusqu'à 20 par question). Les sessions de quiz sont stockées dans **Redis** (clé `quiz:partie:<id>`, TTL 10 min) : elles survivent à un redémarrage du serveur et le mode multi-workers fonctionne. Le chrono est mesuré côté serveur.
 
 ### Menu console
 

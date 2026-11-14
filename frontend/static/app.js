@@ -189,6 +189,72 @@ async function loadStats() {
   } catch (e) { console.error('stats:', e); }
 }
 
+/* ── TOP 10 (rendu partagé + WebSocket) ── */
+function top10TableHtml(top, colonneRang = 'Rang') {
+  return `<div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width:52px">${colonneRang}</th>
+          <th>Joueur</th>
+          <th>Identifiant</th>
+          <th style="text-align:right">Score</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${top.map(e => `
+        <tr>
+          <td><span class="rank-num ${rankClass(e.rang)}">${e.rang}</span></td>
+          <td>
+            <div class="player-cell">
+              <div class="avatar">${initials(e.nom)}</div>
+              <span class="player-name">${e.nom}</span>
+            </div>
+          </td>
+          <td><span class="player-id">${e.id}</span></td>
+          <td style="text-align:right">
+            <span class="score-value">${fmtScore(e.score)}</span>
+            <span class="score-unit">pts</span>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+/* Mise à jour immédiate des deux tables Top 10 (message WebSocket reçu) */
+function majTop10Direct(top) {
+  for (const idConteneur of ['top10Container', 'top10Full']) {
+    const c = document.getElementById(idConteneur);
+    if (c && c.querySelector('.data-table')) {
+      c.innerHTML = top10TableHtml(top, idConteneur === 'top10Full' ? 'Rang' : '#');
+    }
+  }
+  reinitIcons();
+}
+
+let _ws = null;
+let _wsTimer = null;
+
+function connecterWebSocket() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  try {
+    _ws = new WebSocket(`${proto}://${location.host}/ws/top10`);
+  } catch (e) { return; }
+
+  _ws.onmessage = (ev) => {
+    try {
+      const d = JSON.parse(ev.data);
+      if (d.type === 'top10') majTop10Direct(d.top);
+    } catch (e) { /* message illisible : ignoré */ }
+  };
+  _ws.onclose = () => {
+    clearTimeout(_wsTimer);
+    _wsTimer = setTimeout(connecterWebSocket, 3000);   // reconnexion auto
+  };
+  _ws.onerror = () => { try { _ws.close(); } catch (e) { /* rien */ } };
+}
+
 /* ── TOP 10 (dashboard) ── */
 async function loadTop10() {
   const c = document.getElementById('top10Container');
@@ -199,35 +265,7 @@ async function loadTop10() {
       c.innerHTML = emptyState('Aucun joueur classé', 'trophy');
       return;
     }
-    c.innerHTML = `<div class="table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th style="width:52px">#</th>
-            <th>Joueur</th>
-            <th>Identifiant</th>
-            <th style="text-align:right">Score</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${top.map(e => `
-          <tr>
-            <td><span class="rank-num ${rankClass(e.rang)}">${e.rang}</span></td>
-            <td>
-              <div class="player-cell">
-                <div class="avatar">${initials(e.nom)}</div>
-                <span class="player-name">${e.nom}</span>
-              </div>
-            </td>
-            <td><span class="player-id">${e.id}</span></td>
-            <td style="text-align:right">
-              <span class="score-value">${fmtScore(e.score)}</span>
-              <span class="score-unit">pts</span>
-            </td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
+    c.innerHTML = top10TableHtml(top, '#');
     reinitIcons();
   } catch (e) {
     c.innerHTML = errorState(e.message);
@@ -245,35 +283,7 @@ async function loadTop10Full() {
       c.innerHTML = emptyState('Aucun joueur classé', 'trophy');
       return;
     }
-    c.innerHTML = `<div class="table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th style="width:52px">Rang</th>
-            <th>Joueur</th>
-            <th>ID</th>
-            <th style="text-align:right">Score</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${top.map(e => `
-          <tr>
-            <td><span class="rank-num ${rankClass(e.rang)}">${e.rang}</span></td>
-            <td>
-              <div class="player-cell">
-                <div class="avatar">${initials(e.nom)}</div>
-                <span class="player-name">${e.nom}</span>
-              </div>
-            </td>
-            <td><span class="player-id">${e.id}</span></td>
-            <td style="text-align:right">
-              <span class="score-value">${fmtScore(e.score)}</span>
-              <span class="score-unit">pts</span>
-            </td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
+    c.innerHTML = top10TableHtml(top, 'Rang');
     reinitIcons();
   } catch (e) {
     c.innerHTML = errorState(e.message);
@@ -649,6 +659,7 @@ async function creerJoueur(e) {
     pseudo: document.getElementById('newPseudo').value.trim(),
     niveau: parseInt(document.getElementById('newNiveau').value) || 1,
     score:  parseInt(document.getElementById('newScore').value)  || 0,
+    mot_de_passe: document.getElementById('newMdp').value,
   };
   result.innerHTML = '';
   btn.disabled = true;
@@ -700,4 +711,5 @@ async function ajouterPoints(e) {
 /* ── BOOT ── */
 checkStatus();
 showPage('dashboard');
+connecterWebSocket();
 setInterval(checkStatus, 30_000);

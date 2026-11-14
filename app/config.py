@@ -30,3 +30,17 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 NEO4J_URL = os.getenv("NEO4J_URL", "bolt://localhost:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password123")
+
+# --------------------------------------------------
+# Auth (JWT)
+# --------------------------------------------------
+JWT_SECRET = os.getenv(
+    "JWT_SECRET",
+    "secret-de-dev-a-changer-absolument-en-production-avec-une-longue-cle-aleatoire",
+)
+JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "720"))   # 12 h
+
+# --------------------------------------------------
+# Quiz
+# --------------------------------------------------
+QUIZ_PARTIE_TTL = int(os.getenv("QUIZ_PARTIE_TTL", "600"))         # secondes

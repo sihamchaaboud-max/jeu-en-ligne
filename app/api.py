@@ -23,15 +23,18 @@ Lancer avec :
     python -m uvicorn app.api:app --reload --port 8000
 """
 
+import json
+import time
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from app import auth_service as auth
 from app.joueur_service import JoueurService
 from app.quiz_service import Partie, NB_QUESTIONS, TEMPS_LIMITE
 from app.services import mongo_service as mongo
@@ -60,8 +63,47 @@ FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-# Service partagé (connexions ouvertes une seule fois)
-service = JoueurService()
+# Service partagé (connexions ouvertes une seule fois).
+# Au démarrage, les bases Docker ne sont pas toujours prêtes tout de suite
+# (Neo4j peut mettre 30 s à ouvrir Bolt) : on attend avec des tentatives
+# au lieu de faire planter le serveur.
+def _creer_service(tentatives: int = 30, pause: float = 2.0) -> JoueurService:
+    for essai in range(1, tentatives + 1):
+        try:
+            return JoueurService()
+        except Exception as e:   # noqa: BLE001 — on retente quoi qu'il arrive
+            print(f"[api] bases non prêtes ({essai}/{tentatives}) : {e}")
+            time.sleep(pause)
+    raise RuntimeError("MongoDB/Redis/Neo4j injoignables après plusieurs tentatives")
+
+
+service = _creer_service()
+
+
+# ─────────────────────────────────────────────
+# WebSocket — Top 10 en direct
+# ─────────────────────────────────────────────
+# Les clients ouverts sur /ws/top10 reçoivent le classement à jour
+# après chaque changement de score (quiz terminé, points ajoutés…).
+connexions_ws: set[WebSocket] = set()
+
+
+async def diffuser_top10() -> None:
+    """Envoie le Top 10 frais à tous les clients WebSocket connectés."""
+    if not connexions_ws:
+        return
+    try:
+        message = json.dumps({"type": "top10", "top": service.get_top_10_global()})
+    except Exception as e:   # noqa: BLE001
+        print(f"[api] diffusion impossible : {e}")
+        return
+    mortes = []
+    for ws in list(connexions_ws):
+        try:
+            await ws.send_text(message)
+        except Exception:    # noqa: BLE001 — client parti ou réseau coupé
+            mortes.append(ws)
+    connexions_ws.difference_update(mortes)
 
 
 # ─────────────────────────────────────────────
@@ -72,6 +114,7 @@ class JoueurCreate(BaseModel):
     pseudo: str
     niveau: int = 1
     score: int = 0
+    mot_de_passe: str = ""      # optionnel : active l'authentification du joueur
 
 
 class AmitiéCreate(BaseModel):
@@ -99,6 +142,17 @@ class QuizStart(BaseModel):
 class QuizAnswer(BaseModel):
     partie_id: str
     reponse: str = ""
+
+
+class AuthDefinir(BaseModel):
+    """Définit (ou change) le mot de passe d'un joueur existant."""
+    joueur_id: str
+    mot_de_passe: str
+
+
+class AuthLogin(BaseModel):
+    joueur_id: str
+    mot_de_passe: str
 
 
 # ─────────────────────────────────────────────
@@ -133,7 +187,7 @@ def get_classement_amis(joueur_id: str):
 def get_stats():
     """Statistiques globales du jeu."""
     total_redis = service.redis.get_nombre_joueurs()
-    total_mongo = len(mongo.lister_joueurs())
+    total_mongo = mongo.compter_joueurs()
     top1 = service.get_top_10_global()
     return {
         "joueurs_classes": total_redis,
@@ -190,10 +244,14 @@ def get_joueur(joueur_id: str):
 
 @app.post("/api/joueur", status_code=201, tags=["Joueurs"])
 def creer_joueur(data: JoueurCreate):
-    """Crée un joueur dans les 3 bases."""
+    """Crée un joueur dans les 3 bases (avec rollback si une base échoue).
+
+    Si `mot_de_passe` est fourni, le joueur pourra s'authentifier pour le quiz.
+    """
     if mongo.joueur_existe(data.id):
         raise HTTPException(status_code=409, detail=f"Le joueur '{data.id}' existe déjà")
-    service.creer_joueur(data.id, data.pseudo, data.niveau, data.score)
+    service.creer_joueur(data.id, data.pseudo, data.niveau, data.score,
+                         mot_de_passe=data.mot_de_passe)
     return {"message": f"Joueur '{data.pseudo}' créé avec succès", "id": data.id}
 
 
@@ -208,12 +266,14 @@ def supprimer_joueur(joueur_id: str):
 
 
 @app.put("/api/score/{joueur_id}", tags=["Joueurs"])
-def update_score(joueur_id: str, data: ScoreUpdate):
-    """Ajoute (ou retire) des points à un joueur."""
+async def update_score(joueur_id: str, data: ScoreUpdate):
+    """Ajoute (ou retire) des points à un joueur. Notifie les clients WebSocket."""
     if not mongo.joueur_existe(joueur_id):
         raise HTTPException(status_code=404, detail=f"Joueur '{joueur_id}' introuvable")
     nouveau = service.redis.increment_score(joueur_id, data.points)
     rang    = service.redis.get_rang(joueur_id)
+    service.redis.publier_maj_scores()
+    await diffuser_top10()
     return {"joueur_id": joueur_id, "nouveau_score": int(nouveau), "rang": rang}
 
 
@@ -295,22 +355,82 @@ def supprimer_ami(data: AmitiéCreate):
 
 
 # ─────────────────────────────────────────────────────────────
-# API — Quiz (calcul mental, score ajouté dans Redis)
+# API — Auth (JWT, mots de passe hashés dans MongoDB)
 # ─────────────────────────────────────────────────────────────
-parties_quiz: dict[str, Partie] = {}   # partie_id -> partie en cours
+
+def _joueur_du_token(authorization: str | None) -> str | None:
+    """Extrait le joueur_id d'un en-tête 'Authorization: Bearer <token>'."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    return auth.lire_token(authorization[len("Bearer "):].strip())
 
 
-@app.post("/api/quiz/start", tags=["Quiz"])
-def quiz_start(data: QuizStart):
-    """Démarre une partie de quiz pour un joueur existant."""
+@app.post("/api/auth/mot-de-passe", tags=["Auth"])
+def definir_mot_de_passe(data: AuthDefinir):
+    """Définit ou change le mot de passe d'un joueur existant (hash PBKDF2)."""
     if not mongo.joueur_existe(data.joueur_id):
         raise HTTPException(status_code=404, detail=f"Joueur '{data.joueur_id}' introuvable")
+    if len(data.mot_de_passe) < 4:
+        raise HTTPException(status_code=422, detail="Mot de passe trop court (4 caractères min)")
+    mongo.definir_mot_de_passe(data.joueur_id, auth.hacher_mot_de_passe(data.mot_de_passe))
+    return {"message": f"Mot de passe défini pour '{data.joueur_id}'"}
+
+
+@app.post("/api/auth/login", tags=["Auth"])
+def login(data: AuthLogin):
+    """Connexion : renvoie un token JWT si le mot de passe est correct.
+
+    Les joueurs créés avant l'authentification (seed, données de test) n'ont
+    pas de mot de passe : le token est alors null et ils peuvent jouer
+    directement (mode héritage).
+    """
+    stocke = mongo.get_mot_de_passe(data.joueur_id)
+    if stocke is None:
+        if not mongo.joueur_existe(data.joueur_id):
+            raise HTTPException(status_code=404, detail=f"Joueur '{data.joueur_id}' introuvable")
+        return {
+            "token": None,
+            "joueur_id": data.joueur_id,
+            "sans_mot_de_passe": True,
+            "message": "Ce joueur n'a pas de mot de passe (mode héritage)",
+        }
+    if not auth.verifier_mot_de_passe(data.mot_de_passe, stocke):
+        raise HTTPException(status_code=401, detail="Mot de passe incorrect")
+    return {
+        "token": auth.creer_token(data.joueur_id),
+        "joueur_id": data.joueur_id,
+        "sans_mot_de_passe": False,
+    }
+
+
+# ─────────────────────────────────────────────────────────────
+# API — Quiz (calcul mental, score ajouté dans Redis)
+# Les sessions vivent dans REDIS (clé quiz:partie:<id>, TTL 10 min) :
+# survit à un redémarrage du serveur et compatible avec plusieurs workers.
+# ─────────────────────────────────────────────────────────────
+
+@app.post("/api/quiz/start", tags=["Quiz"])
+def quiz_start(data: QuizStart, authorization: str | None = Header(default=None)):
+    """Démarre une partie de quiz pour un joueur existant.
+
+    Si le joueur a défini un mot de passe, un token JWT valide est exigé
+    (impossible de jouer pour quelqu'un d'autre).
+    """
+    if not mongo.joueur_existe(data.joueur_id):
+        raise HTTPException(status_code=404, detail=f"Joueur '{data.joueur_id}' introuvable")
+
+    if mongo.get_mot_de_passe(data.joueur_id) is not None:
+        joueur_token = _joueur_du_token(authorization)
+        if joueur_token is None:
+            raise HTTPException(status_code=401, detail="Token requis pour ce joueur (connecte-toi)")
+        if joueur_token != data.joueur_id:
+            raise HTTPException(status_code=403, detail="Ce token ne correspond pas à ce joueur")
 
     partie = Partie(data.joueur_id)
     question = partie.question_suivante()
 
     partie_id = uuid.uuid4().hex[:12]
-    parties_quiz[partie_id] = partie
+    service.redis.sauver_partie(partie_id, partie.to_dict())
 
     return {
         "partie_id": partie_id,
@@ -323,15 +443,17 @@ def quiz_start(data: QuizStart):
 
 
 @app.post("/api/quiz/answer", tags=["Quiz"])
-def quiz_answer(data: QuizAnswer):
+async def quiz_answer(data: QuizAnswer):
     """Vérifie une réponse. Les points gagnés sont ajoutés au score Redis."""
-    partie = parties_quiz.get(data.partie_id)
-    if partie is None or partie.question is None:
+    etat = service.redis.charger_partie(data.partie_id)
+    if etat is None or etat["question"] is None:
         raise HTTPException(status_code=404, detail="Partie de quiz introuvable ou déjà terminée")
 
+    partie = Partie.from_dict(etat)
     resultat = partie.repondre(data.reponse)
     if resultat["correct"]:
         service.redis.increment_score(partie.joueur_id, resultat["points"])
+        service.redis.publier_maj_scores()
 
     reponse = {
         **resultat,
@@ -342,12 +464,33 @@ def quiz_answer(data: QuizAnswer):
     if partie.terminee:
         reponse["nouveau_score"] = int(service.redis.get_score(partie.joueur_id) or 0)
         reponse["rang"] = service.redis.get_rang(partie.joueur_id)
-        parties_quiz.pop(data.partie_id, None)   # nettoyage
+        service.redis.supprimer_partie(data.partie_id)   # nettoyage
+        await diffuser_top10()
     else:
         reponse["numero"] = partie.numero
         reponse["question"] = partie.question_suivante()
+        service.redis.sauver_partie(data.partie_id, partie.to_dict())
 
     return reponse
+
+
+# ─────────────────────────────────────────────────────────────
+# WebSocket — Top 10 en direct
+# ─────────────────────────────────────────────────────────────
+
+@app.websocket("/ws/top10")
+async def ws_top10(ws: WebSocket):
+    """Le client reçoit immédiatement le Top 10, puis à chaque changement de score."""
+    await ws.accept()
+    connexions_ws.add(ws)
+    try:
+        await ws.send_text(json.dumps({"type": "top10", "top": service.get_top_10_global()}))
+        while True:
+            await ws.receive_text()   # messages du client ignorés (garder la connexion)
+    except WebSocketDisconnect:
+        pass
+    finally:
+        connexions_ws.discard(ws)
 
 
 # ─────────────────────────────────────────────────────────────
