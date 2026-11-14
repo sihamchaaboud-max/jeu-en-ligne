@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz de calcul mental</title>
+  <link rel="stylesheet" href="/static/quiz.css">
+</head>
+<body>
+  <main class="carte">
+    <a class="retour" href="/">← Accueil</a>
+    <h1>🧮 Quiz de calcul mental</h1>
+
+    <!-- Écran 1 : saisie de l'ID -->
+    <section id="ecran-debut">
+      <p class="intro">
+        Réponds à 10 calculs le plus vite possible.<br>
+        Plus tu es rapide, plus tu gagnes de points (jusqu’à 20 par question).
+      </p>
+      <label for="joueur-id">Ton ID de joueur</label>
+      <input id="joueur-id" type="text" placeholder="ex : j1" autocomplete="off">
+      <button id="btn-commencer" class="bouton">Commencer</button>
+      <p id="erreur" class="erreur" role="alert"></p>
+    </section>
+
+    <!-- Écran 2 : la partie -->
+    <section id="ecran-jeu" class="cache">
+      <div class="entete-jeu">
+        <span>Joueur : <strong id="pseudo"></strong></span>
+        <span>Score : <strong id="score-partie">0</strong> pts</span>
+      </div>
+
+      <p id="numero" class="numero"></p>
+      <p id="question" class="question"></p>
+
+      <div class="chrono">
+        <div id="barre" class="barre"></div>
+      </div>
+      <p id="temps" class="temps"></p>
+
+      <input id="reponse" type="text" inputmode="numeric" autocomplete="off"
+             placeholder="Ta réponse" aria-label="Ta réponse">
+      <button id="btn-valider" class="bouton">Valider</button>
+
+      <p id="retour" class="retour-reponse" aria-live="polite"></p>
+    </section>
+
+    <!-- Écran 3 : fin de partie -->
+    <section id="ecran-fin" class="cache">
+      <h2>Partie terminée !</h2>
+      <p class="gros"><span id="points-gagnes">0</span> points gagnés</p>
+      <p>Score total : <strong id="score-total">0</strong> pts</p>
+      <p>Rang global : <strong id="rang">-</strong></p>
+
+      <div class="actions">
+        <button id="btn-rejouer" class="bouton">Rejouer</button>
+        <button id="btn-classement" class="bouton secondaire">Voir le Top 10</button>
+      </div>
+
+      <table id="tableau-classement" class="cache">
+        <thead>
+          <tr><th>Rang</th><th>Pseudo</th><th>ID</th><th>Score</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="/static/quiz.js"></script>
+</body>
+</html>
