@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Quiz de calcul mental</title>
+  <meta name="description" content="Arena — quiz de calcul mental : 10 calculs, 10 secondes chacun, score ajouté au classement Redis."/>
+  <title>Arena — Quiz de calcul mental</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   <link rel="stylesheet" href="/static/style.css" />
   <link rel="stylesheet" href="/static/quiz.css" />
@@ -14,7 +15,7 @@
 <body>
 
   <!-- ── PAGE QUIZ (mêmes IDs que le dashboard, pour /static/quiz.js) ── -->
-  <main class="content" style="max-width:720px;margin:0 auto;padding:var(--sp-6)">
+  <main class="content" style="max-width:720px;">
 
     <section id="page-quiz" class="page active">
 
@@ -22,18 +23,23 @@
       <section id="quizDebut" class="quiz-panel-debut">
         <div class="page-header">
           <div>
-            <h1 class="page-title">🧮 Quiz de calcul mental</h1>
+            <p class="page-kicker"><span class="k-num">06</span> <span class="k-rule" aria-hidden="true"></span> Épreuve</p>
+            <h1 class="page-title">Quiz de calcul mental</h1>
             <p class="page-subtitle">
               10 calculs, 10 secondes chacun.
-              Plus tu réponds vite, plus tu gagnes de points (jusqu'à 20 par question).
+              Plus tu réponds vite, plus tu gagnes de points — jusqu'à 20 par question.
             </p>
           </div>
+          <a class="btn-ghost" href="/" aria-label="Retour au dashboard">
+            <i data-lucide="arrow-left" class="icon-xs"></i>
+            Dashboard
+          </a>
         </div>
 
-        <div class="form-panel">
+        <div class="form-panel quiz-start-panel">
           <form id="quizFormDebut" class="form-body">
             <div class="field-group">
-              <label class="field-label" for="quizJoueurId">Ton ID de joueur <span class="required">*</span></label>
+              <label class="field-label" for="quizJoueurId">Ton ID de joueur <span class="required" aria-hidden="true">*</span></label>
               <input id="quizJoueurId" class="field-input" type="text"
                      placeholder="ex : j1" autocomplete="off" required>
               <span class="field-hint">Ton score final est ajouté au classement Redis</span>
@@ -54,29 +60,31 @@
 
       <!-- Écran 2 : la partie -->
       <section id="quizJeu" class="quiz-hidden">
-        <div class="metrics-row" style="margin-bottom:var(--sp-5)">
-          <div class="metric">
-            <span class="metric-label">Joueur</span>
-            <div class="metric-value" id="quizPseudo" style="font-size:var(--text-lg)">—</div>
-          </div>
-          <div class="metric">
-            <span class="metric-label">Score de la partie</span>
-            <div class="metric-value" id="quizScore">0</div>
+        <div class="quiz-head">
+          <div class="quiz-head-stats">
+            <div class="quiz-stat">
+              <span class="quiz-stat-label">Joueur</span>
+              <span class="quiz-stat-value" id="quizPseudo">—</span>
+            </div>
+            <div class="quiz-stat">
+              <span class="quiz-stat-label">Score de la partie</span>
+              <span class="quiz-stat-value quiz-stat-score" id="quizScore">0</span>
+            </div>
           </div>
         </div>
 
         <p id="quizNumero" class="quiz-numero"></p>
-        <p id="quizQuestion" class="quiz-question"></p>
+        <p id="quizQuestion" class="quiz-question" aria-live="polite"></p>
 
-        <div class="quiz-chrono">
+        <div class="quiz-chrono" aria-hidden="true">
           <div id="quizBarre" class="quiz-barre"></div>
         </div>
         <p id="quizTemps" class="quiz-temps"></p>
 
         <form id="quizFormReponse" class="quiz-reponse-form">
-          <input id="quizReponse" class="field-input" type="text" inputmode="numeric"
+          <input id="quizReponse" class="field-input quiz-input" type="text" inputmode="numeric"
                  autocomplete="off" placeholder="Ta réponse" aria-label="Ta réponse">
-          <button type="submit" class="btn-primary">
+          <button type="submit" class="btn-primary quiz-btn">
             <i data-lucide="check" class="icon-xs"></i>
             Valider
           </button>
@@ -89,26 +97,31 @@
       <section id="quizFin" class="quiz-hidden">
         <div class="page-header">
           <div>
-            <h1 class="page-title">🎉 Partie terminée !</h1>
-            <p class="page-subtitle">Ton score a été enregistré dans le classement global</p>
+            <p class="page-kicker"><span class="k-num">06</span> <span class="k-rule" aria-hidden="true"></span> Résultat</p>
+            <h1 class="page-title">Partie terminée</h1>
+            <p class="page-subtitle">Ton score a été enregistré dans le classement global.</p>
           </div>
+          <a class="btn-ghost" href="/" aria-label="Retour au dashboard">
+            <i data-lucide="arrow-left" class="icon-xs"></i>
+            Dashboard
+          </a>
         </div>
 
-        <div class="metrics-row">
-          <div class="metric">
-            <span class="metric-label">Points gagnés</span>
-            <div class="metric-value" id="quizFinPoints">0</div>
-            <div class="metric-sub">cette partie</div>
+        <div class="board quiz-final-board">
+          <div class="board-cell">
+            <span class="board-label">Points gagnés</span>
+            <span class="board-value" id="quizFinPoints">0</span>
+            <span class="board-sub">cette partie</span>
           </div>
-          <div class="metric">
-            <span class="metric-label">Score total</span>
-            <div class="metric-value" id="quizFinTotal">0</div>
-            <div class="metric-sub">points Redis</div>
+          <div class="board-cell">
+            <span class="board-label">Score total</span>
+            <span class="board-value" id="quizFinTotal">0</span>
+            <span class="board-sub">points Redis</span>
           </div>
-          <div class="metric">
-            <span class="metric-label">Rang global</span>
-            <div class="metric-value" id="quizFinRang">—</div>
-            <div class="metric-sub">classement mondial</div>
+          <div class="board-cell">
+            <span class="board-label">Rang global</span>
+            <span class="board-value board-rank" id="quizFinRang">—</span>
+            <span class="board-sub">classement mondial</span>
           </div>
         </div>
 

@@ -77,6 +77,7 @@ const PAGE_TITLES = {
   joueurs:    'Joueurs',
   classement: 'Classement',
   amis:       'Réseau',
+  quiz:       'Quiz de calcul',
   nouveau:    'Nouveau joueur',
 };
 
@@ -84,15 +85,26 @@ function showPage(name) {
   _currentPage = name;
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => {
+    b.classList.remove('active');
+    b.removeAttribute('aria-current');
+  });
 
   const page = document.getElementById('page-' + name);
   if (page) page.classList.add('active');
 
-  document.querySelectorAll(`[data-page="${name}"]`).forEach(el => el.classList.add('active'));
+  document.querySelectorAll(`[data-page="${name}"]`).forEach(el => {
+    el.classList.add('active');
+    el.setAttribute('aria-current', 'page');
+  });
 
   const titleEl = document.getElementById('topbarTitle');
   if (titleEl) titleEl.textContent = PAGE_TITLES[name] || name;
+
+  // Synchronise l'URL sans recharger (partageable)
+  if (history.replaceState && location.hash !== '#' + name) {
+    history.replaceState(null, '', '#' + name);
+  }
 
   // Auto-load
   if (name === 'dashboard')  { loadStats(); loadTop10(); }
@@ -147,17 +159,41 @@ document.querySelectorAll('.nav-item[data-page]').forEach(btn => {
 document.querySelectorAll('.tab-bar').forEach(initTabs);
 
 /* ── DRAWER ── */
+let _drawerPreviousFocus = null;
+
 function openDrawer() {
+  _drawerPreviousFocus = document.activeElement;
   document.getElementById('profilDrawer').classList.add('open');
   document.getElementById('drawerOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
+  // Le focus va au tiroir : navigation clavier immédiate
+  const closeBtn = document.querySelector('#profilDrawer .icon-btn');
+  if (closeBtn) closeBtn.focus();
 }
 
 function closeDrawer() {
   document.getElementById('profilDrawer').classList.remove('open');
   document.getElementById('drawerOverlay').classList.remove('open');
   document.body.style.overflow = '';
+  if (_drawerPreviousFocus && typeof _drawerPreviousFocus.focus === 'function') {
+    _drawerPreviousFocus.focus();
+    _drawerPreviousFocus = null;
+  }
 }
+
+/* Échap ferme le tiroir */
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('profilDrawer').classList.contains('open')) {
+    closeDrawer();
+  }
+});
+
+/* Échap ferme aussi la sidebar mobile */
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.getElementById('sidebar').classList.remove('mobile-open');
+  }
+});
 
 // Legacy alias
 function closePanel() { closeDrawer(); }
@@ -248,7 +284,13 @@ function connecterWebSocket() {
       if (d.type === 'top10') majTop10Direct(d.top);
     } catch (e) { /* message illisible : ignoré */ }
   };
+  _ws.onopen = () => {
+    const badge = document.getElementById('liveBadge');
+    if (badge) badge.classList.add('on');
+  };
   _ws.onclose = () => {
+    const badge = document.getElementById('liveBadge');
+    if (badge) badge.classList.remove('on');
     clearTimeout(_wsTimer);
     _wsTimer = setTimeout(connecterWebSocket, 3000);   // reconnexion auto
   };
@@ -517,6 +559,10 @@ async function loadAmis() {
   const amisTabs = document.getElementById('amisTabs');
   amisTabs.style.display = 'block';
 
+  // L'indice de guidance n'a plus lieu d'être une fois les résultats affichés
+  const hint = document.getElementById('amisHint');
+  if (hint) hint.style.display = 'none';
+
   // init tabs on this container
   amisTabs.querySelectorAll('.tab-bar').forEach(initTabs);
 
@@ -710,6 +756,14 @@ async function ajouterPoints(e) {
 
 /* ── BOOT ── */
 checkStatus();
-showPage('dashboard');
 connecterWebSocket();
+
+// Liens profonds : /#classement ouvre directement la page (et l'historique reste propre)
+function pageDepuisHash() {
+  const nom = location.hash.replace('#', '');
+  return nom && document.getElementById('page-' + nom) ? nom : 'dashboard';
+}
+showPage(pageDepuisHash());
+window.addEventListener('hashchange', () => showPage(pageDepuisHash()));
+
 setInterval(checkStatus, 30_000);

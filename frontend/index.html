@@ -1,45 +1,48 @@
 <!DOCTYPE html>
-<html lang="fr" data-theme="dark">
+<html lang="fr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="description" content="Arena — console du jeu en ligne : joueurs (MongoDB), classements (Redis), réseau d'amis (Neo4j) et quiz de calcul mental."/>
   <title>Arena — NoSQL Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   <link rel="stylesheet" href="/static/style.css" />
   <link rel="stylesheet" href="/static/quiz.css" />
 </head>
 <body>
 
+  <a class="skip-link" href="#main-content">Aller au contenu</a>
+
   <!-- ═══════════════ SHELL ═══════════════ -->
   <div class="shell">
 
     <!-- ── SIDEBAR ── -->
-    <aside class="sidebar" id="sidebar">
+    <aside class="sidebar" id="sidebar" aria-label="Navigation principale">
       <div class="sidebar-header">
         <div class="brand">
-          <div class="brand-mark">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <div class="brand-mark" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
           </div>
           <span class="brand-name">Arena</span>
         </div>
-        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Replier la navigation">
           <i data-lucide="panel-left-close" class="icon-sm"></i>
         </button>
       </div>
 
       <nav class="sidebar-nav">
         <div class="nav-section">
-          <span class="nav-section-label">Vue d'ensemble</span>
-          <button class="nav-item active" data-page="dashboard">
+          <span class="nav-section-label"><span class="k-num">01</span> Vue d'ensemble</span>
+          <button class="nav-item active" data-page="dashboard" aria-current="page">
             <i data-lucide="layout-dashboard" class="nav-icon"></i>
             <span class="nav-label">Dashboard</span>
           </button>
         </div>
         <div class="nav-section">
-          <span class="nav-section-label">Gestion</span>
+          <span class="nav-section-label"><span class="k-num">02</span> Gestion</span>
           <button class="nav-item" data-page="joueurs">
             <i data-lucide="users" class="nav-icon"></i>
             <span class="nav-label">Joueurs</span>
@@ -65,10 +68,10 @@
 
       <div class="sidebar-footer">
         <div class="system-status" id="sidebarStatus">
-          <span class="status-dot" id="statusDot"></span>
-          <span class="status-label" id="statusText">Vérification...</span>
+          <span class="status-dot" id="statusDot" aria-hidden="true"></span>
+          <span class="status-label" id="statusText">Vérification…</span>
         </div>
-        <div class="db-stack">
+        <div class="db-stack" aria-label="Bases de données connectées">
           <span class="db-tag db-mongo">Mongo</span>
           <span class="db-tag db-redis">Redis</span>
           <span class="db-tag db-neo4j">Neo4j</span>
@@ -76,98 +79,87 @@
       </div>
     </aside>
 
-    <!-- ── MAIN AREA ── -->
+    <!-- ── ZONE PRINCIPALE ── -->
     <div class="main-area">
 
-      <!-- Top bar -->
       <header class="topbar">
-        <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open menu">
+        <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Ouvrir le menu">
           <i data-lucide="menu" class="icon-sm"></i>
         </button>
         <div class="topbar-title" id="topbarTitle">Dashboard</div>
         <div class="topbar-actions">
-          <button class="icon-btn" onclick="refreshCurrent()" title="Actualiser">
+          <span class="live-badge" id="liveBadge" title="Top 10 en direct (WebSocket)">
+            <span class="live-dot" aria-hidden="true"></span>
+            En direct
+          </span>
+          <button class="icon-btn" onclick="refreshCurrent()" title="Actualiser la page" aria-label="Actualiser la page">
             <i data-lucide="refresh-cw" class="icon-sm"></i>
           </button>
         </div>
       </header>
 
       <!-- Pages -->
-      <main class="content">
+      <main class="content" id="main-content">
 
-        <!-- ── DASHBOARD ── -->
+        <!-- ══ DASHBOARD ══ -->
         <section id="page-dashboard" class="page active">
 
           <div class="page-header">
             <div>
+              <p class="page-kicker"><span class="k-num">01</span> <span class="k-rule" aria-hidden="true"></span> Vue d'ensemble</p>
               <h1 class="page-title">Dashboard</h1>
-              <p class="page-subtitle">Vue d'ensemble de la plateforme</p>
+              <p class="page-subtitle">État de la plateforme — trois bases, un classement.</p>
             </div>
           </div>
 
-          <div class="metrics-row">
-            <div class="metric">
-              <div class="metric-header">
-                <span class="metric-label">Joueurs total</span>
-                <div class="metric-icon metric-icon-blue">
-                  <i data-lucide="users" class="icon-xs"></i>
-                </div>
+          <!-- Tableau d'affichage -->
+          <div class="board" role="group" aria-label="Statistiques clés">
+            <div class="board-cell board-cell-leader">
+              <span class="board-label">Champion actuel</span>
+              <div class="board-leader-row">
+                <span class="board-leader-icon" aria-hidden="true"><i data-lucide="crown"></i></span>
+                <span class="board-leader-name" id="statLeader">—</span>
               </div>
-              <div class="metric-value" id="statTotal">—</div>
-              <div class="metric-sub">enregistrés en base</div>
+              <span class="board-sub">tête du classement Redis</span>
             </div>
-            <div class="metric">
-              <div class="metric-header">
-                <span class="metric-label">Leader</span>
-                <div class="metric-icon metric-icon-amber">
-                  <i data-lucide="crown" class="icon-xs"></i>
-                </div>
-              </div>
-              <div class="metric-value" id="statLeader">—</div>
-              <div class="metric-sub">meilleur score</div>
+            <div class="board-cell">
+              <span class="board-label">Joueurs inscrits</span>
+              <span class="board-value" id="statTotal">—</span>
+              <span class="board-sub">profils MongoDB</span>
             </div>
-            <div class="metric">
-              <div class="metric-header">
-                <span class="metric-label">Score max</span>
-                <div class="metric-icon metric-icon-emerald">
-                  <i data-lucide="trending-up" class="icon-xs"></i>
-                </div>
-              </div>
-              <div class="metric-value" id="statTopScore">—</div>
-              <div class="metric-sub">points Redis</div>
+            <div class="board-cell">
+              <span class="board-label">Meilleur score</span>
+              <span class="board-value" id="statTopScore">—</span>
+              <span class="board-sub">points</span>
             </div>
-            <div class="metric">
-              <div class="metric-header">
-                <span class="metric-label">Classés</span>
-                <div class="metric-icon metric-icon-violet">
-                  <i data-lucide="bar-chart-2" class="icon-xs"></i>
-                </div>
-              </div>
-              <div class="metric-value" id="statClasses">—</div>
-              <div class="metric-sub">dans le sorted set</div>
+            <div class="board-cell">
+              <span class="board-label">Classés</span>
+              <span class="board-value" id="statClasses">—</span>
+              <span class="board-sub">sorted set Redis</span>
             </div>
           </div>
 
           <div class="section-header">
-            <h2 class="section-title">Top 10 Global</h2>
-            <button class="btn-ghost btn-sm" onclick="loadTop10()">
+            <h2 class="section-title"><span class="k-num">A</span> Top 10 global</h2>
+            <button class="btn-ghost btn-sm" onclick="loadTop10()" aria-label="Actualiser le Top 10">
               <i data-lucide="refresh-cw" class="icon-xs"></i>
               Actualiser
             </button>
           </div>
           <div id="top10Container">
-            <div class="skeleton-table"></div>
+            <div class="skeleton-table" role="status" aria-label="Chargement du classement"></div>
           </div>
 
         </section>
 
-        <!-- ── JOUEURS ── -->
+        <!-- ══ JOUEURS ══ -->
         <section id="page-joueurs" class="page">
 
           <div class="page-header">
             <div>
+              <p class="page-kicker"><span class="k-num">02</span> <span class="k-rule" aria-hidden="true"></span> Gestion</p>
               <h1 class="page-title">Joueurs</h1>
-              <p class="page-subtitle">Profils stockés dans MongoDB</p>
+              <p class="page-subtitle">Profils et inventaires stockés dans MongoDB.</p>
             </div>
             <button class="btn-primary" onclick="showPage('nouveau')">
               <i data-lucide="user-plus" class="icon-xs"></i>
@@ -177,69 +169,75 @@
 
           <div class="toolbar">
             <div class="search-field">
-              <i data-lucide="search" class="search-icon icon-xs"></i>
-              <input type="text" id="searchJoueur" placeholder="Rechercher par pseudo ou ID…" oninput="filterJoueurs()"/>
+              <i data-lucide="search" class="search-icon icon-xs" aria-hidden="true"></i>
+              <input type="text" id="searchJoueur" placeholder="Rechercher par pseudo ou ID…" oninput="filterJoueurs()" aria-label="Rechercher un joueur"/>
             </div>
-            <button class="btn-ghost btn-sm" onclick="loadJoueurs()">
+            <button class="btn-ghost btn-sm" onclick="loadJoueurs()" aria-label="Actualiser la liste">
               <i data-lucide="refresh-cw" class="icon-xs"></i>
               Actualiser
             </button>
           </div>
 
           <div id="joueursContainer">
-            <div class="skeleton-table"></div>
+            <div class="skeleton-table" role="status" aria-label="Chargement des joueurs"></div>
           </div>
 
           <!-- Drawer profil -->
           <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
-          <aside class="drawer" id="profilDrawer">
+          <aside class="drawer" id="profilDrawer" aria-label="Profil joueur">
             <div class="drawer-header">
               <h3 class="drawer-title" id="profilTitre">Profil</h3>
-              <button class="icon-btn" onclick="closeDrawer()">
+              <button class="icon-btn" onclick="closeDrawer()" aria-label="Fermer le profil">
                 <i data-lucide="x" class="icon-sm"></i>
               </button>
             </div>
             <div class="drawer-body" id="profilContent">
-              <div class="skeleton-block"></div>
+              <div class="skeleton-block" role="status" aria-label="Chargement du profil"></div>
             </div>
           </aside>
 
         </section>
 
-        <!-- ── CLASSEMENT ── -->
+        <!-- ══ CLASSEMENT ══ -->
         <section id="page-classement" class="page">
 
           <div class="page-header">
             <div>
+              <p class="page-kicker"><span class="k-num">03</span> <span class="k-rule" aria-hidden="true"></span> Gestion</p>
               <h1 class="page-title">Classement</h1>
-              <p class="page-subtitle">Scores en temps réel via Redis Sorted Set</p>
+              <p class="page-subtitle">Scores en temps réel via Redis Sorted Set.</p>
             </div>
           </div>
 
-          <div class="tab-bar">
+          <div class="tab-bar" role="tablist" aria-label="Type de classement">
             <button class="tab-pill active" data-tab="tab-global">Global</button>
             <button class="tab-pill" data-tab="tab-amis-class">Entre amis</button>
           </div>
 
-          <div id="tab-global" class="tab-pane active">
-            <div class="section-header" style="margin-top:0">
-              <h2 class="section-title">Top 10 Mondial</h2>
-              <button class="btn-ghost btn-sm" onclick="loadTop10Full()">
+          <div id="tab-global" class="tab-pane active" role="tabpanel">
+            <div class="section-header">
+              <h2 class="section-title"><span class="k-num">A</span> Top 10 mondial</h2>
+              <button class="btn-ghost btn-sm" onclick="loadTop10Full()" aria-label="Actualiser le Top 10 mondial">
                 <i data-lucide="refresh-cw" class="icon-xs"></i>
                 Actualiser
               </button>
             </div>
-            <div id="top10Full"><div class="skeleton-table"></div></div>
+            <div id="top10Full"><div class="skeleton-table" role="status" aria-label="Chargement"></div></div>
           </div>
 
-          <div id="tab-amis-class" class="tab-pane">
+          <div id="tab-amis-class" class="tab-pane" role="tabpanel">
+            <div class="page-hint">
+              <i data-lucide="info" class="icon-sm" aria-hidden="true"></i>
+              Saisis un identifiant (ex : <code>j1</code>) pour classer
+              uniquement ses amis — l'intersection Redis / Neo4j.
+            </div>
             <div class="inline-form">
               <div class="inline-form-label">
-                <i data-lucide="users" class="icon-xs"></i>
+                <i data-lucide="users" class="icon-xs" aria-hidden="true"></i>
                 Classement entre amis d'un joueur
               </div>
               <div class="inline-form-controls">
-                <input type="text" id="classAmisId" placeholder="ID du joueur — ex: j1" class="input-inline"/>
+                <input type="text" id="classAmisId" placeholder="ID du joueur — ex : j1" class="input-inline" aria-label="ID du joueur"/>
                 <button class="btn-primary btn-sm" onclick="loadClassementAmis()">Afficher</button>
               </div>
             </div>
@@ -248,38 +246,45 @@
 
         </section>
 
-        <!-- ── AMIS / RÉSEAU ── -->
+        <!-- ══ RÉSEAU ══ -->
         <section id="page-amis" class="page">
 
           <div class="page-header">
             <div>
+              <p class="page-kicker"><span class="k-num">04</span> <span class="k-rule" aria-hidden="true"></span> Gestion</p>
               <h1 class="page-title">Réseau</h1>
-              <p class="page-subtitle">Relations d'amitié stockées dans Neo4j</p>
+              <p class="page-subtitle">Relations d'amitié et recommandations — graphe Neo4j.</p>
             </div>
           </div>
 
           <div class="inline-form">
             <div class="inline-form-label">
-              <i data-lucide="search" class="icon-xs"></i>
+              <i data-lucide="search" class="icon-xs" aria-hidden="true"></i>
               Explorer le réseau d'un joueur
             </div>
             <div class="inline-form-controls">
-              <input type="text" id="amisJoueurId" placeholder="ID du joueur — ex: j1" class="input-inline"/>
+              <input type="text" id="amisJoueurId" placeholder="ID du joueur — ex : j1" class="input-inline" aria-label="ID du joueur à explorer"/>
               <button class="btn-primary btn-sm" onclick="loadAmis()">Afficher</button>
             </div>
           </div>
 
+          <div class="page-hint" id="amisHint">
+            <i data-lucide="info" class="icon-sm" aria-hidden="true"></i>
+            Saisis un identifiant (ex : <code>j1</code>) pour afficher ses amis directs,
+            les suggestions d'amis d'amis, et le classement entre amis.
+          </div>
+
           <div id="amisTabs" style="display:none">
-            <div class="tab-bar">
+            <div class="tab-bar" role="tablist" aria-label="Vues du réseau">
               <button class="tab-pill active" data-tab="tab-amis-directs">Amis directs</button>
               <button class="tab-pill" data-tab="tab-amis-reco">Suggestions</button>
             </div>
 
-            <div id="tab-amis-directs" class="tab-pane active">
+            <div id="tab-amis-directs" class="tab-pane active" role="tabpanel">
               <div class="section-header">
                 <h2 class="section-title" id="amisDirectsTitre">Amis directs</h2>
                 <div class="inline-form-controls">
-                  <input type="text" id="newAmiId" placeholder="ID du nouvel ami" class="input-inline"/>
+                  <input type="text" id="newAmiId" placeholder="ID du nouvel ami" class="input-inline" aria-label="ID du nouvel ami"/>
                   <button class="btn-primary btn-sm" onclick="ajouterAmi()">
                     <i data-lucide="user-plus" class="icon-xs"></i>
                     Ajouter
@@ -289,10 +294,10 @@
               <div id="amisDirectsResult"></div>
             </div>
 
-            <div id="tab-amis-reco" class="tab-pane">
+            <div id="tab-amis-reco" class="tab-pane" role="tabpanel">
               <div class="section-header">
-                <h2 class="section-title">Suggestions</h2>
-                <span class="badge-label">Traversal Neo4j — 2 degrés</span>
+                <h2 class="section-title"><span class="k-num">B</span> Suggestions</h2>
+                <span class="badge-label">Traversal Neo4j · 2 degrés</span>
               </div>
               <div id="amisRecoResult"></div>
             </div>
@@ -300,13 +305,14 @@
 
         </section>
 
-        <!-- ── NOUVEAU JOUEUR ── -->
+        <!-- ══ NOUVEAU JOUEUR ══ -->
         <section id="page-nouveau" class="page">
 
           <div class="page-header">
             <div>
+              <p class="page-kicker"><span class="k-num">05</span> <span class="k-rule" aria-hidden="true"></span> Gestion</p>
               <h1 class="page-title">Nouveau joueur</h1>
-              <p class="page-subtitle">Création simultanée dans les 3 bases de données</p>
+              <p class="page-subtitle">Création simultanée dans les trois bases, avec rollback si l'une échoue.</p>
             </div>
           </div>
 
@@ -315,22 +321,22 @@
             <div class="form-panel">
               <div class="form-panel-header">
                 <h3 class="form-panel-title">Créer un joueur</h3>
-                <div class="db-pill-row">
+                <div class="db-pill-row" aria-label="Bases écrites">
                   <span class="db-pill db-pill-mongo">MongoDB</span>
                   <span class="db-pill db-pill-redis">Redis</span>
                   <span class="db-pill db-pill-neo4j">Neo4j</span>
                 </div>
               </div>
 
-              <form onsubmit="creerJoueur(event)" class="form-body">
+              <form onsubmit="creerJoueur(event)" class="form-body" novalidate>
                 <div class="field-group">
-                  <label class="field-label" for="newId">Identifiant unique <span class="required">*</span></label>
-                  <input type="text" id="newId" class="field-input" placeholder="ex: j11" required autocomplete="off"/>
+                  <label class="field-label" for="newId">Identifiant unique <span class="required" aria-hidden="true">*</span></label>
+                  <input type="text" id="newId" class="field-input" placeholder="ex : j11" required autocomplete="off"/>
                   <span class="field-hint">Clé commune aux 3 bases de données</span>
                 </div>
                 <div class="field-group">
-                  <label class="field-label" for="newPseudo">Pseudo <span class="required">*</span></label>
-                  <input type="text" id="newPseudo" class="field-input" placeholder="ex: Alice" required autocomplete="off"/>
+                  <label class="field-label" for="newPseudo">Pseudo <span class="required" aria-hidden="true">*</span></label>
+                  <input type="text" id="newPseudo" class="field-input" placeholder="ex : Alice" required autocomplete="off"/>
                 </div>
                 <div class="field-row">
                   <div class="field-group">
@@ -343,7 +349,7 @@
                   </div>
                 </div>
                 <div class="field-group">
-                  <label class="field-label" for="newMdp">Mot de passe <span class="player-id">(optionnel)</span></label>
+                  <label class="field-label" for="newMdp">Mot de passe <span style="text-transform:none;letter-spacing:0">(optionnel)</span></label>
                   <input type="password" id="newMdp" class="field-input" placeholder="protège son score de quiz" autocomplete="off"/>
                   <span class="field-hint">Si défini, le joueur devra se connecter pour jouer au quiz</span>
                 </div>
@@ -352,7 +358,7 @@
                   Créer le joueur
                 </button>
               </form>
-              <div id="createResult"></div>
+              <div id="createResult" aria-live="polite"></div>
             </div>
 
             <div class="form-panel">
@@ -361,10 +367,10 @@
                 <span class="db-pill db-pill-redis">Redis</span>
               </div>
 
-              <form onsubmit="ajouterPoints(event)" class="form-body">
+              <form onsubmit="ajouterPoints(event)" class="form-body" novalidate>
                 <div class="field-group">
                   <label class="field-label" for="pointsId">ID du joueur</label>
-                  <input type="text" id="pointsId" class="field-input" placeholder="ex: j1" required autocomplete="off"/>
+                  <input type="text" id="pointsId" class="field-input" placeholder="ex : j1" required autocomplete="off"/>
                 </div>
                 <div class="field-group">
                   <label class="field-label" for="pointsVal">Points</label>
@@ -376,32 +382,33 @@
                   Mettre à jour
                 </button>
               </form>
-              <div id="pointsResult"></div>
+              <div id="pointsResult" aria-live="polite"></div>
             </div>
 
           </div>
 
         </section>
 
-        <!-- ── QUIZ ── -->
+        <!-- ══ QUIZ ══ -->
         <section id="page-quiz" class="page">
 
-          <!-- Écran 1 : saisie de l'ID -->
+          <!-- Écran 1 : début -->
           <section id="quizDebut" class="quiz-panel-debut">
             <div class="page-header">
               <div>
-                <h1 class="page-title">🧮 Quiz de calcul mental</h1>
+                <p class="page-kicker"><span class="k-num">06</span> <span class="k-rule" aria-hidden="true"></span> Épreuve</p>
+                <h1 class="page-title">Quiz de calcul mental</h1>
                 <p class="page-subtitle">
                   10 calculs, 10 secondes chacun.
-                  Plus tu réponds vite, plus tu gagnes de points (jusqu'à 20 par question).
+                  Plus tu réponds vite, plus tu gagnes de points — jusqu'à 20 par question.
                 </p>
               </div>
             </div>
 
-            <div class="form-panel">
+            <div class="form-panel quiz-start-panel">
               <form id="quizFormDebut" class="form-body">
                 <div class="field-group">
-                  <label class="field-label" for="quizJoueurId">Ton ID de joueur <span class="required">*</span></label>
+                  <label class="field-label" for="quizJoueurId">Ton ID de joueur <span class="required" aria-hidden="true">*</span></label>
                   <input id="quizJoueurId" class="field-input" type="text"
                          placeholder="ex : j1" autocomplete="off" required>
                   <span class="field-hint">Ton score final est ajouté au classement Redis</span>
@@ -422,29 +429,31 @@
 
           <!-- Écran 2 : la partie -->
           <section id="quizJeu" class="quiz-hidden">
-            <div class="metrics-row" style="margin-bottom:var(--sp-5)">
-              <div class="metric">
-                <span class="metric-label">Joueur</span>
-                <div class="metric-value" id="quizPseudo" style="font-size:var(--text-lg)">—</div>
-              </div>
-              <div class="metric">
-                <span class="metric-label">Score de la partie</span>
-                <div class="metric-value" id="quizScore">0</div>
+            <div class="quiz-head">
+              <div class="quiz-head-stats">
+                <div class="quiz-stat">
+                  <span class="quiz-stat-label">Joueur</span>
+                  <span class="quiz-stat-value" id="quizPseudo">—</span>
+                </div>
+                <div class="quiz-stat">
+                  <span class="quiz-stat-label">Score de la partie</span>
+                  <span class="quiz-stat-value quiz-stat-score" id="quizScore">0</span>
+                </div>
               </div>
             </div>
 
             <p id="quizNumero" class="quiz-numero"></p>
-            <p id="quizQuestion" class="quiz-question"></p>
+            <p id="quizQuestion" class="quiz-question" aria-live="polite"></p>
 
-            <div class="quiz-chrono">
+            <div class="quiz-chrono" aria-hidden="true">
               <div id="quizBarre" class="quiz-barre"></div>
             </div>
             <p id="quizTemps" class="quiz-temps"></p>
 
             <form id="quizFormReponse" class="quiz-reponse-form">
-              <input id="quizReponse" class="field-input" type="text" inputmode="numeric"
+              <input id="quizReponse" class="field-input quiz-input" type="text" inputmode="numeric"
                      autocomplete="off" placeholder="Ta réponse" aria-label="Ta réponse">
-              <button type="submit" class="btn-primary">
+              <button type="submit" class="btn-primary quiz-btn">
                 <i data-lucide="check" class="icon-xs"></i>
                 Valider
               </button>
@@ -453,30 +462,31 @@
             <p id="quizRetour" class="quiz-retour" aria-live="polite"></p>
           </section>
 
-          <!-- Écran 3 : fin de partie -->
+          <!-- Écran 3 : fin -->
           <section id="quizFin" class="quiz-hidden">
             <div class="page-header">
               <div>
-                <h1 class="page-title">🎉 Partie terminée !</h1>
-                <p class="page-subtitle">Ton score a été enregistré dans le classement global</p>
+                <p class="page-kicker"><span class="k-num">06</span> <span class="k-rule" aria-hidden="true"></span> Résultat</p>
+                <h1 class="page-title">Partie terminée</h1>
+                <p class="page-subtitle">Ton score a été enregistré dans le classement global.</p>
               </div>
             </div>
 
-            <div class="metrics-row">
-              <div class="metric">
-                <span class="metric-label">Points gagnés</span>
-                <div class="metric-value" id="quizFinPoints">0</div>
-                <div class="metric-sub">cette partie</div>
+            <div class="board quiz-final-board">
+              <div class="board-cell">
+                <span class="board-label">Points gagnés</span>
+                <span class="board-value" id="quizFinPoints">0</span>
+                <span class="board-sub">cette partie</span>
               </div>
-              <div class="metric">
-                <span class="metric-label">Score total</span>
-                <div class="metric-value" id="quizFinTotal">0</div>
-                <div class="metric-sub">points Redis</div>
+              <div class="board-cell">
+                <span class="board-label">Score total</span>
+                <span class="board-value" id="quizFinTotal">0</span>
+                <span class="board-sub">points Redis</span>
               </div>
-              <div class="metric">
-                <span class="metric-label">Rang global</span>
-                <div class="metric-value" id="quizFinRang">—</div>
-                <div class="metric-sub">classement mondial</div>
+              <div class="board-cell">
+                <span class="board-label">Rang global</span>
+                <span class="board-value board-rank" id="quizFinRang">—</span>
+                <span class="board-sub">classement mondial</span>
               </div>
             </div>
 
@@ -498,8 +508,11 @@
     </div>
   </div>
 
+  <!-- Scrim mobile (ferme la sidebar au clic) -->
+  <div class="mobile-scrim" onclick="document.getElementById('sidebar').classList.remove('mobile-open')" aria-hidden="true"></div>
+
   <!-- ═══════════════ TOAST ═══════════════ -->
-  <div class="toast" id="toast">
+  <div class="toast" id="toast" role="status" aria-live="polite">
     <i data-lucide="check-circle" class="icon-xs toast-icon" id="toastIcon"></i>
     <span id="toastMsg"></span>
   </div>

@@ -188,8 +188,9 @@
     partieId = null;
     $("quizFinPoints").textContent = d.score_partie;
     $("quizFinTotal").textContent = d.nouveau_score;
-    $("quizFinRang").textContent = d.rang ? `#${d.rang}` : "—";
+    $("quizFinRang").textContent = d.rang ? `${d.rang}` : "—";
     montrer("quizFin");
+    $("quizFin").scrollIntoView({ behavior: "smooth", block: "start" });
 
     // Met à jour le Top 10 du dashboard avec le nouveau score
     try {

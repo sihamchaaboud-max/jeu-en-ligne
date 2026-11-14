@@ -1,87 +1,177 @@
-/* =====================================================
-   Quiz de calcul mental
-   Utilise les variables de style.css (--surface-*, --accent, ...)
-   ===================================================== */
+/* ═══════════════════════════════════════════════════════════════
+   ARENA — Quiz de calcul mental
+   Épreuve chronométrée : grande équation, chrono fil d'or,
+   retour immédiat. Chargée après style.css (partage ses tokens).
+   ═══════════════════════════════════════════════════════════════ */
 
 .quiz-hidden { display: none !important; }
 
-.quiz-panel-debut { max-width: 520px; }
+/* ── Écran 1 : lancement ── */
+.quiz-panel-debut { max-width: 560px; }
 
+/* ── Erreur de lancement ── */
 .quiz-erreur {
-  padding: 0 var(--sp-6) var(--sp-5);
+  display: block;
+  margin-top: var(--sp-4);
+  min-height: 1.4em;
+  font-size: var(--text-sm);
+  font-weight: 500;
   color: var(--danger);
-  font-size: var(--text-sm);
 }
-.quiz-erreur:empty { padding: 0; }
+.quiz-erreur:empty { margin: 0; min-height: 0; }
 
-.quiz-numero {
-  margin: 0 0 var(--sp-2);
-  text-align: center;
-  font-size: var(--text-sm);
+/* ── Écran 2 : la partie ── */
+.quiz-head { margin-bottom: var(--sp-8); }
+
+.quiz-head-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+  max-width: 560px;
+}
+
+.quiz-stat {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3) var(--sp-4);
+}
+
+.quiz-stat-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: var(--sp-1);
 }
 
-.quiz-temps {
-  margin: var(--sp-2) 0 0;
-  text-align: center;
+.quiz-stat-value {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.quiz-stat-score { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+/* Numéro de question — ticker façon scoreboard */
+.quiz-numero {
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  text-align: center;
+  margin-bottom: var(--sp-3);
 }
 
+/* La question : le grand moment. Équation pleine largeur, chiffres tabulaires */
 .quiz-question {
-  margin: var(--sp-2) 0 var(--sp-6);
-  text-align: center;
-  font-size: 3rem;
+  font-family: var(--font-display);
+  font-size: 44px;
   font-weight: 700;
   letter-spacing: -0.02em;
+  text-align: center;
   color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  margin: var(--sp-2) 0 var(--sp-6);
+  min-height: 1.2em;
 }
 
+/* Chrono : un fil fin, or → rouge quand urgent */
 .quiz-chrono {
-  height: 8px;
+  height: 3px;
+  background: var(--surface-3);
+  border-radius: 2px;
   overflow: hidden;
-  border-radius: var(--r-md);
-  background: var(--surface-4);
+  max-width: 560px;
+  margin: 0 auto var(--sp-2);
 }
-.quiz-barre {
-  width: 100%;
-  height: 100%;
-  background: var(--accent);
-}
-.quiz-barre.urgent { background: var(--warning); }
 
+.quiz-barre {
+  height: 100%;
+  width: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 60ms linear;
+}
+
+.quiz-barre.urgent { background: var(--danger); }
+
+.quiz-temps {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: var(--sp-6);
+}
+
+/* Saisie de réponse : centrée, large, usage clavier immédiat */
 .quiz-reponse-form {
   display: flex;
-  gap: var(--sp-2);
-  margin-top: var(--sp-5);
-}
-.quiz-reponse-form .field-input {
-  flex: 1;
-  text-align: center;
-  font-size: var(--text-lg);
+  gap: var(--sp-3);
+  justify-content: center;
+  max-width: 560px;
+  margin: 0 auto;
 }
 
-.quiz-retour {
-  min-height: 1.6em;
-  margin-top: var(--sp-4);
+.quiz-input {
+  flex: 1;
   text-align: center;
-  font-size: var(--text-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-lg) !important;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.quiz-btn { padding: var(--sp-3) var(--sp-5); }
+
+/* Retour de réponse — ok / ko, affirmation nette */
+.quiz-retour {
+  display: block;
+  margin-top: var(--sp-5);
+  min-height: 1.5em;
+  text-align: center;
+  font-size: var(--text-sm);
   font-weight: 600;
 }
 .quiz-retour.ok { color: var(--success); }
 .quiz-retour.ko { color: var(--danger); }
+.quiz-retour:empty { margin: 0; min-height: 0; }
+
+/* ── Écran 3 : fin de partie ── */
+.quiz-final-board { margin-bottom: var(--sp-8); }
+
+/* Rang affiché en or avec préfixe # */
+.board-rank::before {
+  content: "#";
+  color: var(--text-tertiary);
+  font-size: 0.6em;
+  font-weight: 600;
+  margin-right: 2px;
+  vertical-align: 6%;
+}
 
 .quiz-actions {
   display: flex;
-  flex-wrap: wrap;
   gap: var(--sp-3);
+  justify-content: center;
 }
 
-/* L'écran de fin n'a que 3 cartes : on garde 3 colonnes */
-#quizFin .metrics-row { grid-template-columns: repeat(3, 1fr); }
-
-@media (max-width: 768px) {
-  #quizFin .metrics-row { grid-template-columns: 1fr; }
-  .quiz-question { font-size: 2.2rem; }
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  .quiz-question { font-size: 32px; }
+  .quiz-head-stats { grid-template-columns: 1fr; }
+  .quiz-reponse-form { flex-direction: column; }
+  .quiz-actions { flex-direction: column; }
+  .quiz-actions .btn-primary,
+  .quiz-actions .btn-ghost { width: 100%; justify-content: center; }
+  .board-rank::before { display: none; }
 }
