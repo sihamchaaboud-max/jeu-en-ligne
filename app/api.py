@@ -23,6 +23,7 @@ Lancer avec :
     python -m uvicorn app.api:app --reload --port 8000
 """
 
+import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -32,6 +33,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.joueur_service import JoueurService
+from app.quiz_service import Partie, NB_QUESTIONS, TEMPS_LIMITE
 from app.services import mongo_service as mongo
 from app.services import neo4j_service as neo4j
 
@@ -88,6 +90,15 @@ class NiveauUpdate(BaseModel):
 class ObjetAction(BaseModel):
     objet: str
     qte: int = 1
+
+
+class QuizStart(BaseModel):
+    joueur_id: str
+
+
+class QuizAnswer(BaseModel):
+    partie_id: str
+    reponse: str = ""
 
 
 # ─────────────────────────────────────────────
@@ -281,3 +292,70 @@ def supprimer_ami(data: AmitiéCreate):
     if not ok:
         raise HTTPException(status_code=404, detail="Ces joueurs ne sont pas amis")
     return {"message": "Amitié supprimée"}
+
+
+# ─────────────────────────────────────────────────────────────
+# API — Quiz (calcul mental, score ajouté dans Redis)
+# ─────────────────────────────────────────────────────────────
+parties_quiz: dict[str, Partie] = {}   # partie_id -> partie en cours
+
+
+@app.post("/api/quiz/start", tags=["Quiz"])
+def quiz_start(data: QuizStart):
+    """Démarre une partie de quiz pour un joueur existant."""
+    if not mongo.joueur_existe(data.joueur_id):
+        raise HTTPException(status_code=404, detail=f"Joueur '{data.joueur_id}' introuvable")
+
+    partie = Partie(data.joueur_id)
+    question = partie.question_suivante()
+
+    partie_id = uuid.uuid4().hex[:12]
+    parties_quiz[partie_id] = partie
+
+    return {
+        "partie_id": partie_id,
+        "pseudo": mongo.get_pseudo(data.joueur_id),
+        "nb_questions": NB_QUESTIONS,
+        "temps_limite": TEMPS_LIMITE,
+        "numero": 1,
+        "question": question,
+    }
+
+
+@app.post("/api/quiz/answer", tags=["Quiz"])
+def quiz_answer(data: QuizAnswer):
+    """Vérifie une réponse. Les points gagnés sont ajoutés au score Redis."""
+    partie = parties_quiz.get(data.partie_id)
+    if partie is None or partie.question is None:
+        raise HTTPException(status_code=404, detail="Partie de quiz introuvable ou déjà terminée")
+
+    resultat = partie.repondre(data.reponse)
+    if resultat["correct"]:
+        service.redis.increment_score(partie.joueur_id, resultat["points"])
+
+    reponse = {
+        **resultat,
+        "score_partie": partie.score,
+        "termine": partie.terminee,
+    }
+
+    if partie.terminee:
+        reponse["nouveau_score"] = int(service.redis.get_score(partie.joueur_id) or 0)
+        reponse["rang"] = service.redis.get_rang(partie.joueur_id)
+        parties_quiz.pop(data.partie_id, None)   # nettoyage
+    else:
+        reponse["numero"] = partie.numero
+        reponse["question"] = partie.question_suivante()
+
+    return reponse
+
+
+# ─────────────────────────────────────────────────────────────
+# Frontend — page quiz autonome
+# ─────────────────────────────────────────────────────────────
+@app.get("/quiz", include_in_schema=False)
+def quiz_page():
+    page = FRONTEND_DIR / "quiz.html"
+    if page.exists():
+        return FileResponse(str(page))
+    raise HTTPException(status_code=404, detail="Quiz non trouvé")

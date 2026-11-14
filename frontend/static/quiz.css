@@ -14,6 +14,21 @@
 }
 .quiz-erreur:empty { padding: 0; }
 
+.quiz-numero {
+  margin: 0 0 var(--sp-2);
+  text-align: center;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.quiz-temps {
+  margin: var(--sp-2) 0 0;
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
 .quiz-question {
   margin: var(--sp-2) 0 var(--sp-6);
   text-align: center;

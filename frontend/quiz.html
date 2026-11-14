@@ -4,68 +4,127 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Quiz de calcul mental</title>
-  <link rel="stylesheet" href="/static/quiz.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/quiz.css" />
 </head>
 <body>
-  <main class="carte">
-    <a class="retour" href="/">← Accueil</a>
-    <h1>🧮 Quiz de calcul mental</h1>
 
-    <!-- Écran 1 : saisie de l'ID -->
-    <section id="ecran-debut">
-      <p class="intro">
-        Réponds à 10 calculs le plus vite possible.<br>
-        Plus tu es rapide, plus tu gagnes de points (jusqu’à 20 par question).
-      </p>
-      <label for="joueur-id">Ton ID de joueur</label>
-      <input id="joueur-id" type="text" placeholder="ex : j1" autocomplete="off">
-      <button id="btn-commencer" class="bouton">Commencer</button>
-      <p id="erreur" class="erreur" role="alert"></p>
-    </section>
+  <!-- ── PAGE QUIZ (mêmes IDs que le dashboard, pour /static/quiz.js) ── -->
+  <main class="content" style="max-width:720px;margin:0 auto;padding:var(--sp-6)">
 
-    <!-- Écran 2 : la partie -->
-    <section id="ecran-jeu" class="cache">
-      <div class="entete-jeu">
-        <span>Joueur : <strong id="pseudo"></strong></span>
-        <span>Score : <strong id="score-partie">0</strong> pts</span>
-      </div>
+    <section id="page-quiz" class="page active">
 
-      <p id="numero" class="numero"></p>
-      <p id="question" class="question"></p>
+      <!-- Écran 1 : saisie de l'ID -->
+      <section id="quizDebut" class="quiz-panel-debut">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">🧮 Quiz de calcul mental</h1>
+            <p class="page-subtitle">
+              10 calculs, 10 secondes chacun.
+              Plus tu réponds vite, plus tu gagnes de points (jusqu'à 20 par question).
+            </p>
+          </div>
+        </div>
 
-      <div class="chrono">
-        <div id="barre" class="barre"></div>
-      </div>
-      <p id="temps" class="temps"></p>
+        <div class="form-panel">
+          <form id="quizFormDebut" class="form-body">
+            <div class="field-group">
+              <label class="field-label" for="quizJoueurId">Ton ID de joueur <span class="required">*</span></label>
+              <input id="quizJoueurId" class="field-input" type="text"
+                     placeholder="ex : j1" autocomplete="off" required>
+              <span class="field-hint">Ton score final est ajouté au classement Redis</span>
+            </div>
+            <button type="submit" class="btn-primary btn-full">
+              <i data-lucide="play" class="icon-xs"></i>
+              Commencer
+            </button>
+          </form>
+        </div>
+        <p id="quizErreur" class="quiz-erreur" role="alert"></p>
+      </section>
 
-      <input id="reponse" type="text" inputmode="numeric" autocomplete="off"
-             placeholder="Ta réponse" aria-label="Ta réponse">
-      <button id="btn-valider" class="bouton">Valider</button>
+      <!-- Écran 2 : la partie -->
+      <section id="quizJeu" class="quiz-hidden">
+        <div class="metrics-row" style="margin-bottom:var(--sp-5)">
+          <div class="metric">
+            <span class="metric-label">Joueur</span>
+            <div class="metric-value" id="quizPseudo" style="font-size:var(--text-lg)">—</div>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Score de la partie</span>
+            <div class="metric-value" id="quizScore">0</div>
+          </div>
+        </div>
 
-      <p id="retour" class="retour-reponse" aria-live="polite"></p>
-    </section>
+        <p id="quizNumero" class="quiz-numero"></p>
+        <p id="quizQuestion" class="quiz-question"></p>
 
-    <!-- Écran 3 : fin de partie -->
-    <section id="ecran-fin" class="cache">
-      <h2>Partie terminée !</h2>
-      <p class="gros"><span id="points-gagnes">0</span> points gagnés</p>
-      <p>Score total : <strong id="score-total">0</strong> pts</p>
-      <p>Rang global : <strong id="rang">-</strong></p>
+        <div class="quiz-chrono">
+          <div id="quizBarre" class="quiz-barre"></div>
+        </div>
+        <p id="quizTemps" class="quiz-temps"></p>
 
-      <div class="actions">
-        <button id="btn-rejouer" class="bouton">Rejouer</button>
-        <button id="btn-classement" class="bouton secondaire">Voir le Top 10</button>
-      </div>
+        <form id="quizFormReponse" class="quiz-reponse-form">
+          <input id="quizReponse" class="field-input" type="text" inputmode="numeric"
+                 autocomplete="off" placeholder="Ta réponse" aria-label="Ta réponse">
+          <button type="submit" class="btn-primary">
+            <i data-lucide="check" class="icon-xs"></i>
+            Valider
+          </button>
+        </form>
 
-      <table id="tableau-classement" class="cache">
-        <thead>
-          <tr><th>Rang</th><th>Pseudo</th><th>ID</th><th>Score</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+        <p id="quizRetour" class="quiz-retour" aria-live="polite"></p>
+      </section>
+
+      <!-- Écran 3 : fin de partie -->
+      <section id="quizFin" class="quiz-hidden">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">🎉 Partie terminée !</h1>
+            <p class="page-subtitle">Ton score a été enregistré dans le classement global</p>
+          </div>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric">
+            <span class="metric-label">Points gagnés</span>
+            <div class="metric-value" id="quizFinPoints">0</div>
+            <div class="metric-sub">cette partie</div>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Score total</span>
+            <div class="metric-value" id="quizFinTotal">0</div>
+            <div class="metric-sub">points Redis</div>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Rang global</span>
+            <div class="metric-value" id="quizFinRang">—</div>
+            <div class="metric-sub">classement mondial</div>
+          </div>
+        </div>
+
+        <div class="quiz-actions">
+          <button id="quizRejouer" class="btn-primary">
+            <i data-lucide="rotate-ccw" class="icon-xs"></i>
+            Rejouer
+          </button>
+          <button id="quizVoirClassement" class="btn-ghost">
+            <i data-lucide="trophy" class="icon-xs"></i>
+            Voir le Top 10
+          </button>
+        </div>
+      </section>
+
     </section>
   </main>
 
   <script src="/static/quiz.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
 </body>
 </html>
