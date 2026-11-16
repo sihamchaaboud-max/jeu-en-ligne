@@ -76,3 +76,26 @@ class Partie:
             "temps": round(temps_mis, 1),
             "bonne_reponse": bonne_reponse,
         }
+
+    # ─────────────────────────────────────────────
+    # Sérialisation (la partie vit dans Redis, pas en mémoire)
+    # ─────────────────────────────────────────────
+    def to_dict(self) -> dict:
+        """État complet de la partie, prêt pour JSON."""
+        return {
+            "joueur_id": self.joueur_id,
+            "numero": self.numero,
+            "score": self.score,
+            "question": self.question,
+            "heure_question": self.heure_question,
+        }
+
+    @classmethod
+    def from_dict(cls, donnees: dict) -> "Partie":
+        """Reconstruit une Partie depuis son état sérialisé."""
+        partie = cls(donnees["joueur_id"])
+        partie.numero = donnees["numero"]
+        partie.score = donnees["score"]
+        partie.question = donnees["question"]
+        partie.heure_question = donnees["heure_question"]
+        return partie

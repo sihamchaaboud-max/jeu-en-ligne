@@ -1,0 +1,49 @@
+# CI : lance les 3 bases NoSQL comme conteneurs de service, puis pytest.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+      neo4j:
+        image: neo4j:5
+        ports:
+          - 7474:7474
+          - 7687:7687
+        env:
+          NEO4J_AUTH: neo4j/password123
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p password123 'RETURN 1'"
+          --health-interval 5s
+          --health-timeout 10s
+          --health-retries 30
+          --health-start-period 40s
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Lancer les tests
+        run: pytest tests/ -v
