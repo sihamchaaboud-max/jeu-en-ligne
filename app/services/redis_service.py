@@ -110,6 +110,11 @@ class RedisService:
         """Retourne le nombre total de joueurs classés."""
         return self.client.zcard(CLE_CLASSEMENT_GLOBAL)
 
+    def tous_les_scores(self) -> dict[str, int]:
+        """Tous les scores en une lecture : {joueur_id: score} (ZRANGE complet)."""
+        resultats = self.client.zrange(CLE_CLASSEMENT_GLOBAL, 0, -1, withscores=True)
+        return {joueur_id: int(score) for joueur_id, score in resultats}
+
     # ==================================================
     # Classement entre amis
     # ==================================================
@@ -140,6 +145,53 @@ class RedisService:
         # Tri par score décroissant
         classement.sort(key=lambda x: x[1], reverse=True)
         return classement
+
+    # ==================================================
+    # Classement paginé + fenêtre "autour d'un joueur"
+    # ==================================================
+
+    def get_classement_page(self, page: int = 1, par_page: int = 20) -> tuple[int, list[tuple[str, int]]]:
+        """Une page du classement global complet (au-delà du Top 10).
+
+        Args:
+            page:     numéro de page (1-indexé)
+            par_page: taille de page
+
+        Returns:
+            (total_de_joueurs, [(joueur_id, score), ...])
+        """
+        page    = max(1, page)
+        par_page = min(max(1, par_page), 100)
+        total   = self.client.zcard(CLE_CLASSEMENT_GLOBAL)
+        debut   = (page - 1) * par_page
+        resultats = self.client.zrevrange(
+            CLE_CLASSEMENT_GLOBAL, debut, debut + par_page - 1, withscores=True
+        )
+        return total, [(joueur_id, int(score)) for joueur_id, score in resultats]
+
+    def get_autour(self, joueur_id: str, rayon: int = 3) -> tuple[int | None, list[tuple[int, str, int]]]:
+        """Fenêtre de classement autour d'un joueur (lui inclus).
+
+        Args:
+            joueur_id: le joueur central
+            rayon:     combien de joueurs avant / après
+
+        Returns:
+            (rang_du_joueur, [(rang, id, score), ...]) — rang None s'il n'est pas classé.
+        """
+        rang = self.get_rang(joueur_id)
+        if rang is None:
+            return None, []
+        rayon  = min(max(0, rayon), 50)
+        debut  = max(0, rang - 1 - rayon)                    # zrevrank est 0-indexé
+        resultats = self.client.zrevrange(
+            CLE_CLASSEMENT_GLOBAL, debut, debut + 2 * rayon, withscores=True
+        )
+        fenetre = [
+            (debut + i + 1, joueur, int(score))
+            for i, (joueur, score) in enumerate(resultats)
+        ]
+        return rang, fenetre
 
     # ==================================================
     # Sessions de quiz (état stocké dans Redis, pas en mémoire)

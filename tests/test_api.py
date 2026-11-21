@@ -3,6 +3,13 @@ from fastapi.testclient import TestClient
 from app.api import app, service
 from app.services import mongo_service as mongo
 
+import app.config as cfg
+
+# Clé d'administration pour les tests.
+# api.py lit cfg.ADMIN_TOKEN dynamiquement : la surcharge fonctionne.
+cfg.ADMIN_TOKEN = "cle-admin-test"
+HEADERS_ADMIN = {"X-Admin-Key": "cle-admin-test"}
+
 client = TestClient(app)
 
 
@@ -84,10 +91,23 @@ def test_auth_cycle_complet():
     if not mongo.joueur_existe("quiz_auth"):
         svc.creer_joueur("quiz_auth", "AuthTest", 1, 0)
     try:
-        # 1. définir le mot de passe
+        # 1. définir le mot de passe (via la clé d'administration)
         r = client.post("/api/auth/mot-de-passe",
-                        json={"joueur_id": "quiz_auth", "mot_de_passe": "secret123"})
+                        json={"joueur_id": "quiz_auth", "mot_de_passe": "secret123"},
+                        headers=HEADERS_ADMIN)
         assert r.status_code == 200
+
+        # 1b. sans authentification → refusé (plus aucune prise de contrôle possible)
+        r = client.post("/api/auth/mot-de-passe",
+                        json={"joueur_id": "quiz_auth", "mot_de_passe": "pirate123"})
+        assert r.status_code == 401
+
+        # 1c. avec un token d'un AUTRE joueur → refusé
+        from app import auth_service as auth
+        r = client.post("/api/auth/mot-de-passe",
+                        json={"joueur_id": "quiz_auth", "mot_de_passe": "pirate123"},
+                        headers={"Authorization": f"Bearer {auth.creer_token('pirate')}"})
+        assert r.status_code == 403
 
         # 2. mauvais mot de passe → 401
         r = client.post("/api/auth/login",
@@ -100,6 +120,12 @@ def test_auth_cycle_complet():
         assert r.status_code == 200
         token = r.json()["token"]
         assert token
+
+        # 3b. le joueur lui-même peut changer son mot de passe avec son propre token
+        r = client.post("/api/auth/mot-de-passe",
+                        json={"joueur_id": "quiz_auth", "mot_de_passe": "secret456"},
+                        headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
 
         # 4. quiz sans token → 401
         r = client.post("/api/quiz/start", json={"joueur_id": "quiz_auth"})

@@ -130,3 +130,79 @@ def retirer_objet(player_id: str, objet: str, qte: int = 1) -> None:
 def supprimer_profil(player_id: str) -> None:
     """Supprime le joueur et son inventaire."""
     joueurs.delete_one({"_id": player_id})
+
+
+# ─────────────────────────────────────────────
+# Historique des parties (point 4 — MongoDB)
+# ─────────────────────────────────────────────
+historique_col = db["historique_parties"]
+
+
+def enregistrer_partie(player_id: str, points: int, duree_secondes: float, nb_bonnes: int) -> None:
+    """Ajoute une entrée dans l'historique des parties d'un joueur.
+
+    Args:
+        player_id:        identifiant du joueur
+        points:           points gagnés durant cette partie
+        duree_secondes:   durée totale de la partie
+        nb_bonnes:        nombre de bonnes réponses
+    """
+    from datetime import datetime, timezone
+    historique_col.insert_one({
+        "joueur_id": player_id,
+        "points":    points,
+        "duree":     round(duree_secondes, 1),
+        "bonnes":    nb_bonnes,
+        "date":      datetime.now(timezone.utc),
+    })
+
+
+def get_historique(player_id: str, limite: int = 10) -> list[dict]:
+    """Retourne les dernières parties d'un joueur, de la plus récente à la plus ancienne.
+
+    Args:
+        player_id: identifiant du joueur
+        limite:    nombre maximum d'entrées à retourner
+
+    Returns:
+        Liste de dicts : {points, duree, bonnes, date}
+    """
+    docs = historique_col.find(
+        {"joueur_id": player_id},
+        {"_id": 0, "joueur_id": 0},
+        sort=[("date", -1)],
+        limit=limite,
+    )
+    result = []
+    for d in docs:
+        d["date"] = d["date"].isoformat()
+        result.append(d)
+    return result
+
+
+def get_stats_joueur(player_id: str) -> dict:
+    """Statistiques agrégées : total parties, meilleur score, moyenne.
+
+    Returns:
+        {nb_parties, meilleur_score, score_moyen, total_bonnes}
+    """
+    pipeline = [
+        {"$match": {"joueur_id": player_id}},
+        {"$group": {
+            "_id":          None,
+            "nb_parties":   {"$sum": 1},
+            "meilleur":     {"$max": "$points"},
+            "total_points": {"$sum": "$points"},
+            "total_bonnes": {"$sum": "$bonnes"},
+        }},
+    ]
+    rows = list(historique_col.aggregate(pipeline))
+    if not rows:
+        return {"nb_parties": 0, "meilleur_score": 0, "score_moyen": 0, "total_bonnes": 0}
+    r = rows[0]
+    return {
+        "nb_parties":    r["nb_parties"],
+        "meilleur_score": r["meilleur"],
+        "score_moyen":   round(r["total_points"] / r["nb_parties"]),
+        "total_bonnes":  r["total_bonnes"],
+    }
