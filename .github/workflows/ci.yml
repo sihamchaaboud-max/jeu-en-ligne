@@ -47,3 +47,5 @@ jobs:
 
       - name: Lancer les tests
         run: pytest tests/ -v
+        env:
+          JWT_SECRET: cle-de-test-ci-uniquement-a-remplacer-en-prod-0123456789

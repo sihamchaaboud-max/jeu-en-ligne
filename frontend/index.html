@@ -5,12 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta name="description" content="Arena — console du jeu en ligne : joueurs (MongoDB), classements (Redis), réseau d'amis (Neo4j) et quiz de calcul mental."/>
   <title>Arena — NoSQL Dashboard</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-  <link rel="stylesheet" href="/static/style.css"?v=20261114 />
-  <link rel="stylesheet" href="/static/quiz.css"?v=20261114 />
+  <link rel="stylesheet" href="/static/fonts.css?v=20261121">
+  <link rel="stylesheet" href="/static/style.css?v=20261121">
+  <link rel="stylesheet" href="/static/quiz.css?v=20261121">
+  <link rel="stylesheet" href="/static/v2.css?v=20261121">
+  <link rel="stylesheet" href="/static/premium.css?v=20261121">
 </head>
 <body>
 
@@ -92,6 +91,7 @@
             <span class="live-dot" aria-hidden="true"></span>
             En direct
           </span>
+          <span class="session-zone" id="sessionZone"></span>
           <button class="icon-btn" onclick="refreshCurrent()" title="Actualiser la page" aria-label="Actualiser la page">
             <i data-lucide="refresh-cw" class="icon-sm"></i>
           </button>
@@ -211,18 +211,47 @@
 
           <div class="tab-bar" role="tablist" aria-label="Type de classement">
             <button class="tab-pill active" data-tab="tab-global">Global</button>
+            <button class="tab-pill" data-tab="tab-autour">Autour de moi</button>
             <button class="tab-pill" data-tab="tab-amis-class">Entre amis</button>
           </div>
 
           <div id="tab-global" class="tab-pane active" role="tabpanel">
             <div class="section-header">
-              <h2 class="section-title"><span class="k-num">A</span> Top 10 mondial</h2>
-              <button class="btn-ghost btn-sm" onclick="loadTop10Full()" aria-label="Actualiser le Top 10 mondial">
+              <h2 class="section-title"><span class="k-num">A</span> Podium</h2>
+            </div>
+            <div id="podiumGlobal" class="podium" aria-label="Podium des trois meilleurs"></div>
+
+            <div class="section-header">
+              <h2 class="section-title"><span class="k-num">B</span> Classement mondial complet</h2>
+              <button class="btn-ghost btn-sm" id="btnRefreshClassement" aria-label="Actualiser le classement">
                 <i data-lucide="refresh-cw" class="icon-xs"></i>
                 Actualiser
               </button>
             </div>
-            <div id="top10Full"><div class="skeleton-table" role="status" aria-label="Chargement"></div></div>
+            <div id="classementGlobal"><div class="skeleton-table" role="status" aria-label="Chargement"></div></div>
+            <div class="pager" id="pagerGlobal" style="display:none">
+              <button class="btn-ghost btn-sm" id="pagerPrec" aria-label="Page précédente">← Précédent</button>
+              <span class="pager-info" id="pagerInfo">—</span>
+              <button class="btn-ghost btn-sm" id="pagerSuiv" aria-label="Page suivante">Suivant →</button>
+            </div>
+          </div>
+
+          <div id="tab-autour" class="tab-pane" role="tabpanel">
+            <div class="page-hint">
+              <i data-lucide="crosshair" class="icon-sm" aria-hidden="true"></i>
+              Affiche la fenêtre de classement autour d'un joueur (3 rangs avant, 3 après).
+            </div>
+            <div class="inline-form">
+              <div class="inline-form-label">
+                <i data-lucide="locate" class="icon-xs" aria-hidden="true"></i>
+                Position dans le classement mondial
+              </div>
+              <div class="inline-form-controls">
+                <input type="text" id="autourId" placeholder="ID du joueur — ex : j1" class="input-inline" list="listeJoueurs" aria-label="ID du joueur"/>
+                <button class="btn-primary btn-sm" id="btnAutour">Afficher</button>
+              </div>
+            </div>
+            <div id="autourResult"></div>
           </div>
 
           <div id="tab-amis-class" class="tab-pane" role="tabpanel">
@@ -278,13 +307,14 @@
             <div class="tab-bar" role="tablist" aria-label="Vues du réseau">
               <button class="tab-pill active" data-tab="tab-amis-directs">Amis directs</button>
               <button class="tab-pill" data-tab="tab-amis-reco">Suggestions</button>
+              <button class="tab-pill" data-tab="tab-amis-demandes">Demandes</button>
             </div>
 
             <div id="tab-amis-directs" class="tab-pane active" role="tabpanel">
               <div class="section-header">
                 <h2 class="section-title" id="amisDirectsTitre">Amis directs</h2>
                 <div class="inline-form-controls">
-                  <input type="text" id="newAmiId" placeholder="ID du nouvel ami" class="input-inline" aria-label="ID du nouvel ami"/>
+                  <input type="text" id="newAmiId" placeholder="ID du nouvel ami" class="input-inline" list="listeJoueurs" aria-label="ID du nouvel ami"/>
                   <button class="btn-primary btn-sm" onclick="ajouterAmi()">
                     <i data-lucide="user-plus" class="icon-xs"></i>
                     Ajouter
@@ -300,6 +330,44 @@
                 <span class="badge-label">Traversal Neo4j · 2 degrés</span>
               </div>
               <div id="amisRecoResult"></div>
+            </div>
+
+            <div id="tab-amis-demandes" class="tab-pane" role="tabpanel">
+              <div class="page-hint">
+                <i data-lucide="inbox" class="icon-sm" aria-hidden="true"></i>
+                Demandes d'ami reçues (à accepter ou refuser) et envoyées (annulables).
+              </div>
+              <div class="inline-form">
+                <div class="inline-form-label">
+                  <i data-lucide="user-check" class="icon-xs" aria-hidden="true"></i>
+                  Boîte de réception d'un joueur
+                </div>
+                <div class="inline-form-controls">
+                  <input type="text" id="demandesId" placeholder="ID du joueur — ex : j1" class="input-inline" list="listeJoueurs" aria-label="ID du joueur"/>
+                  <button class="btn-primary btn-sm" id="btnDemandes">Afficher</button>
+                </div>
+              </div>
+              <div id="demandesResult"></div>
+            </div>
+          </div>
+
+          <!-- Carte visuelle du graphe social -->
+          <div class="section-header" style="margin-top:var(--sp-6)">
+            <h2 class="section-title"><span class="k-num">C</span> Carte du réseau</h2>
+            <button class="btn-ghost btn-sm" id="grapheRefresh" aria-label="Actualiser le graphe">
+              <i data-lucide="refresh-cw" class="icon-xs"></i>
+              Actualiser
+            </button>
+          </div>
+          <div class="graph-shell">
+            <div class="graph-canvas-wrap">
+              <div id="grapheViz" aria-label="Visualisation du graphe d'amitiés"></div>
+              <div class="graph-loading" id="grapheLoading">Chargement du graphe social…</div>
+            </div>
+            <div class="graph-legend" aria-hidden="true">
+              <span class="lg-item"><span class="lg-swatch" style="background:#F2B03D"></span> Podium (top 3)</span>
+              <span class="lg-item"><span class="lg-swatch" style="background:#5B9BE8"></span> Joueur (taille ∝ score)</span>
+              <span class="lg-item">Clic sur un nœud → profil + suggestions en pointillés</span>
             </div>
           </div>
 
@@ -418,6 +486,13 @@
                   <input id="quizMdp" class="field-input" type="password"
                          placeholder="si tu en as défini un" autocomplete="off">
                 </div>
+                <div class="quiz-mode-row">
+                  <label class="switch">
+                    <input type="checkbox" id="quizModeEntrainement" aria-label="Mode entraînement">
+                    <span class="track"></span>
+                  </label>
+                  <span class="quiz-mode-label">Mode entraînement — jouer sans compter au classement</span>
+                </div>
                 <button type="submit" class="btn-primary btn-full">
                   <i data-lucide="play" class="icon-xs"></i>
                   Commencer
@@ -439,9 +514,14 @@
                   <span class="quiz-stat-label">Score de la partie</span>
                   <span class="quiz-stat-value quiz-stat-score" id="quizScore">0</span>
                 </div>
+                <div class="quiz-stat">
+                  <span class="quiz-stat-label">Série</span>
+                  <span class="quiz-stat-value"><span id="quizStreak" class="quiz-streak"></span></span>
+                </div>
               </div>
             </div>
 
+            <div class="quiz-dots" id="quizDots" aria-hidden="true"></div>
             <p id="quizNumero" class="quiz-numero"></p>
             <p id="quizQuestion" class="quiz-question" aria-live="polite"></p>
 
@@ -484,11 +564,20 @@
                 <span class="board-sub">points Redis</span>
               </div>
               <div class="board-cell">
+                <span class="board-label">Record personnel</span>
+                <span class="board-value" id="quizFinRecord">—</span>
+                <span class="board-sub">meilleure partie</span>
+              </div>
+              <div class="board-cell">
                 <span class="board-label">Rang global</span>
                 <span class="board-value board-rank" id="quizFinRang">—</span>
                 <span class="board-sub">classement mondial</span>
               </div>
             </div>
+            <p id="quizFinNote" class="page-hint" style="display:none">
+              <i data-lucide="info" class="icon-sm" aria-hidden="true"></i>
+              Partie d'entraînement : aucun score n'a été compté.
+            </p>
 
             <div class="quiz-actions">
               <button id="quizRejouer" class="btn-primary">
@@ -511,14 +600,84 @@
   <!-- Scrim mobile (ferme la sidebar au clic) -->
   <div class="mobile-scrim" onclick="document.getElementById('sidebar').classList.remove('mobile-open')" aria-hidden="true"></div>
 
+  <!-- ═══════════════ MODALE DE CONNEXION ═══════════════ -->
+  <div class="modal-overlay" id="modalConnexionOverlay"></div>
+  <div class="modal" id="modalConnexion" role="dialog" aria-modal="true" aria-labelledby="modalConnexionTitre">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modalConnexionTitre">Connexion</h3>
+      <button class="icon-btn" data-action="fermer-connexion" aria-label="Fermer">
+        <i data-lucide="x" class="icon-sm"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Panneau : connexion -->
+      <form id="formLogin" class="form-body" novalidate>
+        <div class="field-group">
+          <label class="field-label" for="loginJoueurId">Identifiant joueur</label>
+          <input type="text" id="loginJoueurId" class="field-input" placeholder="ex : j1" list="listeJoueurs" autocomplete="off"/>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="loginMdp">Mot de passe</label>
+          <input type="password" id="loginMdp" class="field-input" placeholder="laisser vide si vous n'en avez pas" autocomplete="off"/>
+          <span class="field-hint">Sans mot de passe : connexion en mode héritage (identité mémorisée seulement)</span>
+        </div>
+        <p id="loginErreur" class="quiz-erreur" role="alert"></p>
+        <button type="submit" class="btn-primary btn-full">
+          <i data-lucide="log-in" class="icon-xs"></i>
+          Se connecter
+        </button>
+      </form>
+
+      <!-- Panneau : changer mon mot de passe -->
+      <form id="formChangerMdp" class="form-body" style="display:none" novalidate>
+        <div class="field-group">
+          <label class="field-label" for="mdpActuel">Mot de passe actuel</label>
+          <input type="password" id="mdpActuel" class="field-input" autocomplete="off"/>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="mdpNouveau">Nouveau mot de passe</label>
+          <input type="password" id="mdpNouveau" class="field-input" autocomplete="off"/>
+          <span class="field-hint">4 caractères minimum</span>
+        </div>
+        <p id="mdpErreur" class="quiz-erreur" role="alert"></p>
+        <button type="submit" class="btn-primary btn-full">
+          <i data-lucide="key-round" class="icon-xs"></i>
+          Mettre à jour
+        </button>
+      </form>
+
+    </div>
+    <div class="modal-footer">
+      <span>Identité stockée localement, jamais envoyée à un tiers.</span>
+      <button class="link-btn" data-action="vers-mdp" id="btnVersMdp">Changer mon mot de passe</button>
+      <button class="link-btn" data-action="vers-login" id="btnVersLogin" style="display:none">← Connexion</button>
+    </div>
+  </div>
+
+  <!-- Autocomplétion native des IDs joueurs -->
+  <datalist id="listeJoueurs"></datalist>
+
   <!-- ═══════════════ TOAST ═══════════════ -->
   <div class="toast" id="toast" role="status" aria-live="polite">
     <i data-lucide="check-circle" class="icon-xs toast-icon" id="toastIcon"></i>
     <span id="toastMsg"></span>
   </div>
 
-  <script src="/static/app.js"?v=20261114></script>
-  <script src="/static/quiz.js"?v=20261114></script>
+  <!-- Bibliothèques auto-hébergées (versions épinglées) -->
+  <script src="/static/vendor/lucide.min.js?v=20261121"></script>
+  <script src="/static/vendor/cytoscape.min.js?v=20261121"></script>
+  <script src="/static/vendor/chart.umd.min.js?v=20261121"></script>
+
+  <!-- Application -->
+  <script src="/static/app.js?v=20261121"></script>
+  <script src="/static/js/auth.js?v=20261121"></script>
+  <script src="/static/js/notifications.js?v=20261121"></script>
+  <script src="/static/js/leaderboard.js?v=20261121"></script>
+  <script src="/static/js/reseau.js?v=20261121"></script>
+  <script src="/static/js/charts.js?v=20261121"></script>
+  <script src="/static/quiz.js?v=20261121"></script>
+  <script src="/static/premium.js?v=20261121"></script>
   <script>
     // Init Lucide icons after DOM ready
     lucide.createIcons();

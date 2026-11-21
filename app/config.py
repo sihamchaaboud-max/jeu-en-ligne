@@ -34,11 +34,23 @@ NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password123")
 # --------------------------------------------------
 # Auth (JWT)
 # --------------------------------------------------
-JWT_SECRET = os.getenv(
-    "JWT_SECRET",
-    "secret-de-dev-a-changer-absolument-en-production-avec-une-longue-cle-aleatoire",
-)
+# Fail-fast : on refuse de démarrer avec un secret absent ou par défaut.
+# Générer une clé :  openssl rand -hex 32
+JWT_SECRET = os.getenv("JWT_SECRET", "").strip()
+_MAUVAIS_SECRET = ("", "CHANGEZ_MOI_AVEC_UNE_CLE_ALEATOIRE_LONGUE")
+if JWT_SECRET in _MAUVAIS_SECRET or JWT_SECRET.startswith("secret-de-dev"):
+    raise RuntimeError(
+        "JWT_SECRET manquant ou non sécurisé dans .env.\n"
+        "Générez une clé avec :  openssl rand -hex 32"
+    )
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "720"))   # 12 h
+
+# --------------------------------------------------
+# Administration
+# --------------------------------------------------
+# Clé partagée pour les opérations d'administration sensibles
+# (ex. définir le mot de passe d'un joueur). Vide = fonction désactivée.
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 
 # --------------------------------------------------
 # Quiz

@@ -97,7 +97,19 @@ python -m uvicorn app.api:app --reload --port 8000
 ### API web
 
 - **Dashboard** : http://localhost:8000 — joueurs, classement, réseau d'amis, quiz
-- **WebSocket** `ws://localhost:8000/ws/top10` : le Top 10 se met à jour en direct à chaque changement de score
+- **Quiz autonome** : http://localhost:8000/quiz — page dédiée au quiz de calcul
+- **WebSocket** `ws://localhost:8000/ws/top10` : mises à jour en direct — `{type:"top10"}` (Top 10) et `{type:"activite"}` (fin de partie d'un joueur, pour les notifications)
+
+### Nouveautés frontend (V2)
+
+- **Session & connexion** : modale de connexion, session mémorisée localement (`localStorage`), changement de mot de passe depuis le dashboard
+- **Classement** : podium des 3 meilleurs, classement mondial complet **paginé** (`GET /api/classement?page=&par_page=`), fenêtre « autour de moi » (`GET /api/classement-autour/{id}?rayon=`)
+- **Réseau social visuel** : carte interactive du graphe d'amitiés (`GET /api/graphe`, Cytoscape.js), nœuds dimensionnés par score, clic → profil + suggestions mises en évidence
+- **Demandes d'ami** : envoi / acceptation / refus (`POST /api/demande-ami`, `POST /api/demande-ami/accepter`, `POST /api/demande-ami/refuser`, `GET /api/demandes-ami/{id}`) — relation Neo4j `AMI_DE` avec statut `en_attente` / `acceptee`
+- **Notifications en direct** : toasts quand un joueur monte au podium ou termine une partie, flash des lignes du classement
+- **Profil** : courbe de progression des scores (Chart.js) dans le tiroir de profil
+- **Quiz amélioré** : points de progression par question, série de bonnes réponses, **mode entraînement** (aucun score compté, `mode:"entrainement"` dans `POST /api/quiz/start`), record personnel sur l'écran de fin
+- **Zéro dépendance externe** : polices (Inter, Sora, JetBrains Mono) et bibliothèques (lucide, Cytoscape, Chart.js) **auto-hébergées** dans `frontend/static/`, versions épinglées
 
 ### Authentification (quiz)
 
@@ -105,7 +117,7 @@ Les joueurs créés via le dashboard peuvent avoir un mot de passe (champ option
 - avec mot de passe → connexion obligatoire pour jouer au quiz (`POST /api/auth/login` → token JWT)
 - sans mot de passe (joueurs du seed, données de test) → jeu direct (mode héritage)
 
-Endpoints : `POST /api/auth/mot-de-passe` (définir/changer), `POST /api/auth/login` (token JWT HS256, 12 h). Les mots de passe sont hashés en PBKDF2-SHA256 + sel, stockés dans MongoDB.
+Endpoints : `POST /api/auth/mot-de-passe` (définir/changer — **protégé** : token du joueur lui-même ou en-tête `X-Admin-Key`), `POST /api/auth/login` (token JWT HS256, 12 h). Les mots de passe sont hashés en PBKDF2-SHA256 + sel, stockés dans MongoDB. `JWT_SECRET` est **obligatoire** dans `.env` (généré avec `openssl rand -hex 32`) : l'API refuse de démarrer avec la valeur par défaut.
 
 ### Quiz de calcul mental
 

@@ -5,12 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Arena — quiz de calcul mental : 10 calculs, 10 secondes chacun, score ajouté au classement Redis."/>
   <title>Arena — Quiz de calcul mental</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-  <link rel="stylesheet" href="/static/style.css"?v=20261114 />
-  <link rel="stylesheet" href="/static/quiz.css"?v=20261114 />
+  <link rel="stylesheet" href="/static/fonts.css?v=20261121">
+  <link rel="stylesheet" href="/static/style.css?v=20261121" />
+  <link rel="stylesheet" href="/static/quiz.css?v=20261121" />
+  <link rel="stylesheet" href="/static/v2.css?v=20261121">
+  <link rel="stylesheet" href="/static/premium.css?v=20261121">
 </head>
 <body>
 
@@ -42,12 +41,19 @@
               <label class="field-label" for="quizJoueurId">Ton ID de joueur <span class="required" aria-hidden="true">*</span></label>
               <input id="quizJoueurId" class="field-input" type="text"
                      placeholder="ex : j1" autocomplete="off" required>
-              <span class="field-hint">Ton score final est ajouté au classement Redis</span>
+              <span class="field-hint">Ton score final est ajouté au classement Redis (sauf en mode entraînement)</span>
             </div>
             <div class="field-group">
               <label class="field-label" for="quizMdp">Mot de passe</label>
               <input id="quizMdp" class="field-input" type="password"
                      placeholder="si tu en as défini un" autocomplete="off">
+            </div>
+            <div class="quiz-mode-row">
+              <label class="switch">
+                <input type="checkbox" id="quizModeEntrainement" aria-label="Mode entraînement">
+                <span class="track"></span>
+              </label>
+              <span class="quiz-mode-label">Mode entraînement — jouer sans compter au classement</span>
             </div>
             <button type="submit" class="btn-primary btn-full">
               <i data-lucide="play" class="icon-xs"></i>
@@ -70,9 +76,14 @@
               <span class="quiz-stat-label">Score de la partie</span>
               <span class="quiz-stat-value quiz-stat-score" id="quizScore">0</span>
             </div>
+            <div class="quiz-stat">
+              <span class="quiz-stat-label">Série</span>
+              <span class="quiz-stat-value"><span id="quizStreak" class="quiz-streak"></span></span>
+            </div>
           </div>
         </div>
 
+        <div class="quiz-dots" id="quizDots" aria-hidden="true"></div>
         <p id="quizNumero" class="quiz-numero"></p>
         <p id="quizQuestion" class="quiz-question" aria-live="polite"></p>
 
@@ -119,11 +130,20 @@
             <span class="board-sub">points Redis</span>
           </div>
           <div class="board-cell">
+            <span class="board-label">Record personnel</span>
+            <span class="board-value" id="quizFinRecord">—</span>
+            <span class="board-sub">meilleure partie</span>
+          </div>
+          <div class="board-cell">
             <span class="board-label">Rang global</span>
             <span class="board-value board-rank" id="quizFinRang">—</span>
             <span class="board-sub">classement mondial</span>
           </div>
         </div>
+        <p id="quizFinNote" class="page-hint" style="display:none">
+          <i data-lucide="info" class="icon-sm" aria-hidden="true"></i>
+          Partie d'entraînement : aucun score n'a été compté.
+        </p>
 
         <div class="quiz-actions">
           <button id="quizRejouer" class="btn-primary">
@@ -140,7 +160,9 @@
     </section>
   </main>
 
-  <script src="/static/quiz.js"?v=20261114></script>
+  <script src="/static/vendor/lucide.min.js?v=20261121"></script>
+  <script src="/static/quiz.js?v=20261121"></script>
+  <script src="/static/premium.js?v=20261121"></script>
   <script>
     lucide.createIcons();
   </script>

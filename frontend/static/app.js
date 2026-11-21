@@ -41,6 +41,13 @@ function initials(name) {
   return (name || '?').substring(0, 2).toUpperCase();
 }
 
+/* Échappe tout texte inséré dans du HTML (anti-XSS : pseudos et IDs sont saisis par des joueurs) */
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
 function fmtScore(n) {
   if (n == null) return '—';
   return n.toLocaleString('fr-FR');
@@ -56,14 +63,14 @@ function rankClass(r) {
 function emptyState(msg, icon = 'inbox') {
   return `<div class="state-empty">
     <i data-lucide="${icon}" style="width:32px;height:32px;opacity:.25"></i>
-    <span class="state-empty-text">${msg}</span>
+    <span class="state-empty-text">${esc(msg)}</span>
   </div>`;
 }
 
 function errorState(msg) {
   return `<div class="state-error">
     <i data-lucide="alert-circle" class="icon-xs"></i>
-    ${msg}
+    ${esc(msg)}
   </div>`;
 }
 
@@ -239,15 +246,15 @@ function top10TableHtml(top, colonneRang = 'Rang') {
       </thead>
       <tbody>
         ${top.map(e => `
-        <tr>
-          <td><span class="rank-num ${rankClass(e.rang)}">${e.rang}</span></td>
+        <tr data-player-id="${esc(e.id)}">
+          <td><span class="rank-num ${rankClass(e.rang)}">${esc(e.rang)}</span></td>
           <td>
             <div class="player-cell">
               <div class="avatar">${initials(e.nom)}</div>
-              <span class="player-name">${e.nom}</span>
+              <span class="player-name">${esc(e.nom)}</span>
             </div>
           </td>
-          <td><span class="player-id">${e.id}</span></td>
+          <td><span class="player-id">${esc(e.id)}</span></td>
           <td style="text-align:right">
             <span class="score-value">${fmtScore(e.score)}</span>
             <span class="score-unit">pts</span>
@@ -267,34 +274,6 @@ function majTop10Direct(top) {
     }
   }
   reinitIcons();
-}
-
-let _ws = null;
-let _wsTimer = null;
-
-function connecterWebSocket() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  try {
-    _ws = new WebSocket(`${proto}://${location.host}/ws/top10`);
-  } catch (e) { return; }
-
-  _ws.onmessage = (ev) => {
-    try {
-      const d = JSON.parse(ev.data);
-      if (d.type === 'top10') majTop10Direct(d.top);
-    } catch (e) { /* message illisible : ignoré */ }
-  };
-  _ws.onopen = () => {
-    const badge = document.getElementById('liveBadge');
-    if (badge) badge.classList.add('on');
-  };
-  _ws.onclose = () => {
-    const badge = document.getElementById('liveBadge');
-    if (badge) badge.classList.remove('on');
-    clearTimeout(_wsTimer);
-    _wsTimer = setTimeout(connecterWebSocket, 3000);   // reconnexion auto
-  };
-  _ws.onerror = () => { try { _ws.close(); } catch (e) { /* rien */ } };
 }
 
 /* ── TOP 10 (dashboard) ── */
@@ -318,6 +297,7 @@ async function loadTop10() {
 /* ── TOP 10 (classement page) ── */
 async function loadTop10Full() {
   const c = document.getElementById('top10Full');
+  if (!c) return;   // le classement complet est rendu par leaderboard.js
   c.innerHTML = '<div class="skeleton-table"></div>';
   try {
     const top = await api('/api/top10');
@@ -359,15 +339,15 @@ async function loadClassementAmis() {
         <tbody>
           ${data.map(e => `
           <tr>
-            <td><span class="rank-num ${rankClass(e.rang)}">${e.rang}</span></td>
+            <td><span class="rank-num ${rankClass(e.rang)}">${esc(e.rang)}</span></td>
             <td>
               <div class="player-cell">
                 <div class="avatar">${initials(e.nom)}</div>
-                <span class="player-name">${e.nom}</span>
+                <span class="player-name">${esc(e.nom)}</span>
                 ${e.id === id ? '<span class="you-tag">vous</span>' : ''}
               </div>
             </td>
-            <td><span class="player-id">${e.id}</span></td>
+            <td><span class="player-id">${esc(e.id)}</span></td>
             <td style="text-align:right">
               <span class="score-value">${fmtScore(e.score)}</span>
               <span class="score-unit">pts</span>
@@ -416,14 +396,14 @@ function renderJoueurs(list) {
       </thead>
       <tbody>
         ${list.map(j => `
-        <tr class="player-row-action" onclick="showProfil('${j.id}')">
+        <tr class="player-row-action" data-joueur-id="${esc(j.id)}">
           <td>
             <div class="player-cell">
               <div class="avatar">${initials(j.pseudo)}</div>
-              <span class="player-name">${j.pseudo}</span>
+              <span class="player-name">${esc(j.pseudo)}</span>
             </div>
           </td>
-          <td><span class="player-id">${j.id}</span></td>
+          <td><span class="player-id">${esc(j.id)}</span></td>
           <td><span class="player-id">${j.niveau}</span></td>
           <td style="text-align:right">
             <span class="score-value">${fmtScore(j.score)}</span>
@@ -460,25 +440,25 @@ async function showProfil(id) {
     title.textContent = j.pseudo;
 
     const invHtml = j.inventaire?.length
-      ? j.inventaire.map(e => `<span class="tag">${e.objet} &times;${e.qte}</span>`).join('')
+      ? j.inventaire.map(e => `<span class="tag">${esc(e.objet)} &times;${esc(e.qte)}</span>`).join('')
       : '<span class="player-id">Inventaire vide</span>';
 
     const amisHtml = j.amis?.length
-      ? j.amis.map(a => `<span class="tag">${a.pseudo}</span>`).join('')
+      ? j.amis.map(a => `<span class="tag">${esc(a.pseudo)}</span>`).join('')
       : '<span class="player-id">Aucun ami</span>';
 
     content.innerHTML = `
       <div class="profil-hero">
         <div class="profil-avatar">${initials(j.pseudo)}</div>
         <div>
-          <div class="profil-name">${j.pseudo}</div>
-          <div class="profil-id">${j.id}</div>
+          <div class="profil-name">${esc(j.pseudo)}</div>
+          <div class="profil-id">${esc(j.id)}</div>
         </div>
       </div>
 
       <div class="profil-stats-grid">
         <div class="profil-stat-item">
-          <div class="profil-stat-value">${j.niveau}</div>
+          <div class="profil-stat-value">${esc(j.niveau)}</div>
           <div class="profil-stat-label">Niveau</div>
           <div class="profil-stat-source">MongoDB</div>
         </div>
@@ -488,12 +468,12 @@ async function showProfil(id) {
           <div class="profil-stat-source">Redis</div>
         </div>
         <div class="profil-stat-item">
-          <div class="profil-stat-value">${j.rang ? '#' + j.rang : '—'}</div>
+          <div class="profil-stat-value">${j.rang ? '#' + esc(j.rang) : '—'}</div>
           <div class="profil-stat-label">Rang mondial</div>
           <div class="profil-stat-source">Redis</div>
         </div>
         <div class="profil-stat-item">
-          <div class="profil-stat-value">${j.nb_amis}</div>
+          <div class="profil-stat-value">${esc(j.nb_amis)}</div>
           <div class="profil-stat-label">Amis</div>
           <div class="profil-stat-source">Neo4j</div>
         </div>
@@ -509,18 +489,25 @@ async function showProfil(id) {
         <div class="tag-list">${amisHtml}</div>
       </div>
 
+      <div class="profil-section">
+        <div class="profil-section-title">Historique des parties — MongoDB</div>
+        <div id="profilHistorique"></div>
+      </div>
+
       <div class="profil-actions">
-        <button class="btn-primary btn-sm" onclick="quickAddPoints('${j.id}')">
+        <button class="btn-primary btn-sm" data-action="add-points" data-id="${esc(j.id)}">
           <i data-lucide="zap" class="icon-xs"></i>
           +100 pts
         </button>
-        <button class="btn-danger" onclick="quickDelete('${j.id}', '${j.pseudo}')">
+        <button class="btn-danger" data-action="delete-player" data-id="${esc(j.id)}" data-pseudo="${esc(j.pseudo)}">
           <i data-lucide="trash-2" class="icon-xs"></i>
           Supprimer
         </button>
       </div>`;
 
     reinitIcons();
+    // Charger l'historique en parallèle dans la section déjà injectée
+    chargerHistorique(j.id, content.querySelector('#profilHistorique'));
   } catch (e) {
     content.innerHTML = errorState(e.message);
     reinitIcons();
@@ -594,19 +581,19 @@ async function loadAmisDirects(id) {
           <td>
             <div class="player-cell">
               <div class="avatar">${initials(a.pseudo)}</div>
-              <span class="player-name">${a.pseudo}</span>
+              <span class="player-name">${esc(a.pseudo)}</span>
             </div>
           </td>
-          <td><span class="player-id">${a.id}</span></td>
+          <td><span class="player-id">${esc(a.id)}</span></td>
           <td style="text-align:right">
             <span class="score-value">${fmtScore(a.score)}</span>
             <span class="score-unit">pts</span>
           </td>
           <td style="text-align:right">
-            ${a.rang ? `<span class="rank-num ${rankClass(a.rang)}">${a.rang}</span>` : '<span class="player-id">—</span>'}
+            ${a.rang ? `<span class="rank-num ${rankClass(a.rang)}">${esc(a.rang)}</span>` : '<span class="player-id">—</span>'}
           </td>
           <td style="text-align:right">
-            <button class="btn-danger" onclick="supprimerAmi('${id}', '${a.id}')">
+            <button class="btn-danger" data-action="remove-ami" data-a="${esc(id)}" data-ami="${esc(a.id)}">
               <i data-lucide="user-minus" class="icon-xs"></i>
               Retirer
             </button>
@@ -643,13 +630,13 @@ async function loadAmisReco(id) {
           <td>
             <div class="player-cell">
               <div class="avatar">${initials(r.pseudo)}</div>
-              <span class="player-name">${r.pseudo}</span>
+              <span class="player-name">${esc(r.pseudo)}</span>
             </div>
           </td>
-          <td><span class="player-id">${r.id}</span></td>
-          <td><span class="mutual-tag">${r.amis_communs} en commun</span></td>
+          <td><span class="player-id">${esc(r.id)}</span></td>
+          <td><span class="mutual-tag">${esc(r.amis_communs)} en commun</span></td>
           <td style="text-align:right">
-            <button class="btn-success" onclick="ajouterAmiDepuisReco('${id}', '${r.id}')">
+            <button class="btn-success" data-action="add-ami" data-a="${esc(id)}" data-ami="${esc(r.id)}">
               <i data-lucide="user-plus" class="icon-xs"></i>
               Ajouter
             </button>
@@ -753,6 +740,182 @@ async function ajouterPoints(e) {
     btn.disabled = false;
   }
 }
+
+/* ── WEBSOCKET — temps réel ──
+   Un seul canal /ws/top10, plusieurs types d'événements :
+   {type:"top10"}   → rendu par défaut des tables
+   {type:"activite"} → notifications (notifications.js s'abonne via onWsMessage) */
+let _wsListeners = [];
+
+function onWsMessage(type, fn) {
+  _wsListeners.push({ type, fn });
+}
+
+function connecterWebSocket() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const url   = `${proto}://${location.host}/ws/top10`;
+  let ws;
+  let tentative = 0;
+
+  function connecter() {
+    ws = new WebSocket(url);
+
+    ws.onopen = () => {
+      tentative = 0;
+      // Allumer le badge "En direct" (classe .on — cf. .live-badge.on dans style.css)
+      const badge = document.getElementById('liveBadge');
+      if (badge) badge.classList.add('on');
+    };
+
+    ws.onmessage = (evt) => {
+      let msg;
+      try { msg = JSON.parse(evt.data); } catch (_) { return; }
+      // Rendu par défaut du Top 10
+      if (msg.type === 'top10') {
+        _renderTop10(msg.top, 'top10Container', '#');
+        _renderTop10(msg.top, 'top10Full', 'Rang');
+        // Mettre à jour les métriques du dashboard
+        if (msg.top.length > 0) {
+          const leader = msg.top[0];
+          const el = document.getElementById('statLeader');
+          if (el) el.textContent = leader.nom;
+          const sc = document.getElementById('statTopScore');
+          if (sc) sc.textContent = fmtScore(leader.score);
+        }
+      }
+      // Abonnés externes (notifications, graphes, etc.)
+      _wsListeners.forEach((l) => { if (l.type === msg.type) l.fn(msg); });
+    };
+
+    ws.onclose = () => {
+      const badge = document.getElementById('liveBadge');
+      if (badge) badge.classList.remove('on');
+      // Reconnexion exponentielle (max 30 s)
+      const delai = Math.min(1000 * 2 ** tentative, 30000);
+      tentative++;
+      setTimeout(connecter, delai);
+    };
+
+    ws.onerror = () => ws.close();
+  }
+
+  connecter();
+}
+
+function _renderTop10(top, containerId, labelRang) {
+  const c = document.getElementById(containerId);
+  if (!c || !top.length) return;
+  c.innerHTML = `<div class="table-wrap">
+    <table class="data-table">
+      <thead><tr>
+        <th style="width:52px">${labelRang}</th>
+        <th>Joueur</th><th>Identifiant</th>
+        <th style="text-align:right">Score</th>
+      </tr></thead>
+      <tbody>
+        ${top.map(e => `
+        <tr data-player-id="${esc(e.id)}">
+          <td><span class="rank-num ${rankClass(e.rang)}">${esc(e.rang)}</span></td>
+          <td><div class="player-cell">
+            <div class="avatar">${initials(e.nom)}</div>
+            <span class="player-name">${esc(e.nom)}</span>
+          </div></td>
+          <td><span class="player-id">${esc(e.id)}</span></td>
+          <td style="text-align:right">
+            <span class="score-value">${fmtScore(e.score)}</span>
+            <span class="score-unit">pts</span>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+  reinitIcons();
+}
+
+/* ── HISTORIQUE dans le drawer de profil ── */
+async function chargerHistorique(joueurId, container) {
+  container.innerHTML = '<div class="skeleton-table" style="height:80px"></div>';
+  try {
+    const [historique, stats] = await Promise.all([
+      api(`/api/historique/${joueurId}?limite=5`),
+      api(`/api/stats-joueur/${joueurId}`),
+    ]);
+
+    if (!historique.length) {
+      container.innerHTML = '<span class="player-id">Aucune partie jouée</span>';
+      return;
+    }
+
+    const statsHtml = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3);margin-bottom:var(--sp-4)">
+        <div class="profil-stat-item">
+          <div class="profil-stat-value">${stats.nb_parties}</div>
+          <div class="profil-stat-label">Parties jouées</div>
+          <div class="profil-stat-source">MongoDB</div>
+        </div>
+        <div class="profil-stat-item">
+          <div class="profil-stat-value">${fmtScore(stats.meilleur_score)}</div>
+          <div class="profil-stat-label">Meilleur score</div>
+          <div class="profil-stat-source">MongoDB</div>
+        </div>
+      </div>`;
+
+    const graphiqueHtml = historique.length >= 2 && typeof dessinerGraphiqueProfil === 'function'
+      ? `<div class="chart-box" style="height:150px;margin-bottom:var(--sp-4)">
+           <canvas id="profilChart"></canvas>
+         </div>`
+      : '';
+
+    const rows = historique.map(p => {
+      const date = new Date(p.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+      return `<tr>
+        <td><span class="player-id">${date}</span></td>
+        <td><span class="score-value">${fmtScore(p.points)}</span> <span class="score-unit">pts</span></td>
+        <td><span class="player-id">${p.bonnes}/10</span></td>
+        <td><span class="player-id">${p.duree}s</span></td>
+      </tr>`;
+    }).join('');
+
+    container.innerHTML = statsHtml + graphiqueHtml + `
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>Date</th><th>Score</th><th>Bonnes rép.</th><th>Durée</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    reinitIcons();
+    if (graphiqueHtml) dessinerGraphiqueProfil(historique);
+  } catch (e) {
+    container.innerHTML = `<span class="player-id" style="color:var(--text-disabled)">Historique indisponible</span>`;
+  }
+}
+
+/* ── DÉLÉGATION D'ÉVÉNEMENTS ──
+   Les handlers vivent sur les conteneurs (persists aux re-rendus) ;
+   les données transitent par data-attributes, jamais par onclick inline. */
+document.getElementById('joueursContainer').addEventListener('click', (e) => {
+  const row = e.target.closest('[data-joueur-id]');
+  if (row) showProfil(row.dataset.joueurId);
+});
+
+document.getElementById('profilContent').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  if (btn.dataset.action === 'add-points')    quickAddPoints(btn.dataset.id);
+  if (btn.dataset.action === 'delete-player') quickDelete(btn.dataset.id, btn.dataset.pseudo);
+});
+
+document.getElementById('amisDirectsResult').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action="remove-ami"]');
+  if (btn) supprimerAmi(btn.dataset.a, btn.dataset.ami);
+});
+
+document.getElementById('amisRecoResult').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action="add-ami"]');
+  if (btn) ajouterAmiDepuisReco(btn.dataset.a, btn.dataset.ami);
+});
 
 /* ── BOOT ── */
 checkStatus();

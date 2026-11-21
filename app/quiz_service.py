@@ -40,14 +40,24 @@ def calculer_points(correct, temps_mis):
 
 
 class Partie:
-    """Une partie de quiz pour un joueur. Le chrono est géré ici (côté serveur)."""
+    """Une partie de quiz pour un joueur. Le chrono est géré ici (côté serveur).
 
-    def __init__(self, joueur_id):
+    mode "classe"       — score compté dans Redis + historique MongoDB (défaut)
+    mode "entrainement" — aucune écriture de score ni d'historique
+    """
+
+    def __init__(self, joueur_id, mode: str = "classe"):
         self.joueur_id = joueur_id
+        self.mode = mode                  # "classe" | "entrainement"
         self.numero = 0                   # numéro de la question en cours
         self.score = 0
         self.question = None
         self.heure_question = None
+
+    @property
+    def comptabilisee(self):
+        """True si la partie compte pour le classement et l'historique."""
+        return self.mode == "classe"
 
     @property
     def terminee(self):
@@ -84,16 +94,17 @@ class Partie:
         """État complet de la partie, prêt pour JSON."""
         return {
             "joueur_id": self.joueur_id,
-            "numero": self.numero,
-            "score": self.score,
-            "question": self.question,
+            "mode":      self.mode,
+            "numero":    self.numero,
+            "score":     self.score,
+            "question":  self.question,
             "heure_question": self.heure_question,
         }
 
     @classmethod
     def from_dict(cls, donnees: dict) -> "Partie":
         """Reconstruit une Partie depuis son état sérialisé."""
-        partie = cls(donnees["joueur_id"])
+        partie = cls(donnees["joueur_id"], donnees.get("mode", "classe"))
         partie.numero = donnees["numero"]
         partie.score = donnees["score"]
         partie.question = donnees["question"]
