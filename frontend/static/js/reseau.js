@@ -11,6 +11,11 @@
 let _cytoscapeInstance = null;
 let _grapheCharge = false;
 let _grapheEnCours = false;
+let _grapheDonnees = null;
+
+let _cyJoueur = null;          // graphe égo-centré du joueur recherché
+let _joueurGrapheId = null;    // dernier ID exploré
+let _egoEnCours = false;
 
 const _COULEUR_OR = '#F2B03D';
 const _COULEUR_NOEUD = '#6FA7E8';
@@ -47,6 +52,7 @@ async function chargerGraphe() {
 
   try {
     const donnees = await api('/api/graphe');
+    _grapheDonnees = donnees;
     if (loading) loading.style.display = 'none';
 
     if (!donnees.noeuds.length) {
@@ -209,6 +215,294 @@ async function chargerGraphe() {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   GRAPHE ÉGO-CENTRÉ — réseau du joueur recherché
+   Le joueur est au centre, ses amis directs autour, et les amis
+   d'amis (suggestions) en périphérie, reliés à leurs amis communs.
+   ═══════════════════════════════════════════════════════════════ */
+
+function detruireCyJoueur() {
+  if (_cyJoueur) { _cyJoueur.destroy(); _cyJoueur = null; }
+}
+
+/* Construit le voisinage du joueur à partir du graphe complet :
+   - amis     : distance 1
+   - suggestions : distance 2, hors amis directs (comme Neo4j) */
+function construireReseauEgo(donnees, id) {
+  const parId = new Map(donnees.noeuds.map((n) => [n.id, n]));
+  if (!parId.has(id)) return null;
+
+  const voisins = new Map();          // id → Set(ids voisins)
+  for (const a of donnees.aretes) {
+    if (!voisins.has(a.a)) voisins.set(a.a, new Set());
+    if (!voisins.has(a.b)) voisins.set(a.b, new Set());
+    voisins.get(a.a).add(a.b);
+    voisins.get(a.b).add(a.a);
+  }
+
+  const amis = new Set(voisins.get(id) || []);
+  const suggestions = new Map();      // id suggestion → Set(amis communs)
+  for (const ami of amis) {
+    for (const f of voisins.get(ami) || []) {
+      if (f === id || amis.has(f)) continue;
+      if (!suggestions.has(f)) suggestions.set(f, new Set());
+      suggestions.get(f).add(ami);
+    }
+  }
+
+  return { parId, amis, suggestions };
+}
+
+function elementsEgo(donnees, id, avecSuggestions) {
+  const reseau = construireReseauEgo(donnees, id);
+  if (!reseau) return null;
+
+  const { parId, amis, suggestions } = reseau;
+  const inclus = new Set([id, ...amis]);
+  if (avecSuggestions) suggestions.forEach((_, sid) => inclus.add(sid));
+
+  const noeuds = [];
+  inclus.forEach((nid) => {
+    const n = parId.get(nid);
+    if (!n) return;
+    const role = nid === id ? 'centre' : amis.has(nid) ? 'ami' : 'suggestion';
+    noeuds.push({
+      data: { id: nid, label: n.pseudo, score: n.score, niveau: n.niveau, role },
+    });
+  });
+
+  // Toutes les arêtes entre les nœuds affichés (amitiés acceptées)
+  const aretes = [];
+  const vues = new Set();
+  for (const a of donnees.aretes) {
+    if (!inclus.has(a.a) || !inclus.has(a.b)) continue;
+    const cle = [a.a, a.b].sort().join('|');
+    if (vues.has(cle)) continue;
+    vues.add(cle);
+    const versSuggestion = a.a !== id && a.b !== id
+      && (suggestions.has(a.a) || suggestions.has(a.b));
+    aretes.push({
+      data: {
+        id: `e:${cle}`,
+        source: a.a,
+        target: a.b,
+        type: versSuggestion ? 'suggestion' : 'ami',
+      },
+    });
+  }
+
+  return {
+    elements: noeuds.concat(aretes),
+    nbAmis: amis.size,
+    nbSuggestions: suggestions.size,
+  };
+}
+
+function styleGrapheEgo() {
+  return [
+    {
+      selector: 'node',
+      style: {
+        'background-fill': 'radial-gradient',
+        'background-gradient-stop-colors': (el) => (
+          el.data('role') === 'centre' ? '#FFE1A0 #F2B03D #C98712'
+          : el.data('role') === 'suggestion' ? '#D7D0FF #9B8BE8 #6B5BC4'
+          : '#B9D8F8 #6FA7E8 #3F74B8'
+        ),
+        'background-gradient-stop-positions': '0% 48% 100%',
+        'background-gradient-direction': 'to-bottom-right',
+        'width': (el) => (el.data('role') === 'centre' ? 58 : el.data('role') === 'ami' ? 36 : 27),
+        'height': (el) => (el.data('role') === 'centre' ? 58 : el.data('role') === 'ami' ? 36 : 27),
+        'label': 'data(label)',
+        'color': '#F5F3EC',
+        'font-family': 'Inter, sans-serif',
+        'font-size': (el) => (el.data('role') === 'centre' ? 13 : 10.5),
+        'font-weight': (el) => (el.data('role') === 'centre' ? 700 : 600),
+        'text-valign': 'bottom',
+        'text-margin-y': 8,
+        'text-outline-width': 2.5,
+        'text-outline-color': 'rgba(8,9,13,0.92)',
+        'border-width': (el) => (el.data('role') === 'suggestion' ? 1.8 : 1.5),
+        'border-style': (el) => (el.data('role') === 'suggestion' ? 'dashed' : 'solid'),
+        'border-color': (el) => (
+          el.data('role') === 'centre' ? 'rgba(255,255,255,0.75)'
+          : el.data('role') === 'suggestion' ? 'rgba(155,139,232,0.9)'
+          : 'rgba(255,255,255,0.5)'
+        ),
+        'underlay-color': (el) => (
+          el.data('role') === 'centre' ? _COULEUR_OR
+          : el.data('role') === 'suggestion' ? '#9B8BE8'
+          : _COULEUR_NOEUD
+        ),
+        'underlay-opacity': (el) => (el.data('role') === 'centre' ? 0.2 : 0.1),
+        'underlay-padding': (el) => (el.data('role') === 'centre' ? 12 : 7),
+        'underlay-shape': 'ellipse',
+        'overlay-opacity': 0,
+        'cursor': 'pointer',
+        'transition-property': 'border-color, border-width, underlay-opacity, underlay-padding, opacity',
+        'transition-duration': 180,
+      },
+    },
+    {
+      selector: 'node.hover',
+      style: {
+        'border-width': 2.6,
+        'border-color': 'rgba(255,255,255,0.85)',
+        'underlay-opacity': 0.26,
+        'underlay-padding': 11,
+      },
+    },
+    {
+      selector: 'edge',
+      style: {
+        'width': 1.5,
+        'line-color': 'rgba(245,243,236,0.18)',
+        'curve-style': 'bezier',
+        'line-opacity': 0.9,
+        'overlay-opacity': 0,
+        'transition-property': 'line-color, width, line-opacity',
+        'transition-duration': 180,
+      },
+    },
+    {
+      selector: 'edge[type="suggestion"]',
+      style: {
+        'width': 1.1,
+        'line-style': 'dashed',
+        'line-color': 'rgba(155,139,232,0.5)',
+        'line-opacity': 0.8,
+      },
+    },
+    {
+      selector: '.dimmed',
+      style: { opacity: 0.22 },
+    },
+  ];
+}
+
+async function chargerGrapheJoueur(id, options = {}) {
+  const { force = false } = options;
+  id = (id || '').trim();
+  if (!id) return;
+
+  const section = document.getElementById('grapheJoueurSection');
+  const c = document.getElementById('grapheJoueurViz');
+  if (!section || !c) return;
+  if (_egoEnCours) return;
+
+  _egoEnCours = true;
+  _joueurGrapheId = id;
+
+  const loading = document.getElementById('grapheJoueurLoading');
+  const vide = document.getElementById('grapheJoueurEmpty');
+  const titre = document.getElementById('grapheJoueurTitre');
+  const sousTitre = document.getElementById('grapheJoueurSousTitre');
+  const toggle = document.getElementById('grapheJoueurSuggestions');
+
+  section.style.display = 'block';
+  if (loading) loading.style.display = 'grid';
+  if (vide) { vide.style.display = 'none'; vide.textContent = ''; }
+  if (titre) titre.textContent = `Réseau de ${id}`;
+  if (sousTitre) sousTitre.textContent = 'Chargement…';
+
+  try {
+    const donnees = (!force && _grapheDonnees) ? _grapheDonnees : await api('/api/graphe');
+    _grapheDonnees = donnees;
+
+    const avecSuggestions = toggle ? toggle.checked : true;
+    const reseau = elementsEgo(donnees, id, avecSuggestions);
+
+    if (!reseau) {
+      detruireCyJoueur();
+      if (loading) loading.style.display = 'none';
+      if (vide) {
+        vide.textContent = `Joueur « ${id} » introuvable dans le graphe.`;
+        vide.style.display = 'grid';
+      }
+      if (sousTitre) sousTitre.textContent = '';
+      return;
+    }
+
+    const { nbAmis, nbSuggestions } = reseau;
+    if (sousTitre) {
+      if (!nbAmis) {
+        sousTitre.textContent = 'Aucun ami direct — ajoutez des amis pour étendre ce réseau.';
+      } else {
+        const amisTxt = `${nbAmis} ami${nbAmis > 1 ? 's' : ''} direct${nbAmis > 1 ? 's' : ''}`;
+        const sugTxt = nbSuggestions
+          ? `${nbSuggestions} suggestion${nbSuggestions > 1 ? 's' : ''}${avecSuggestions ? '' : ' masquée' + (nbSuggestions > 1 ? 's' : '')}`
+          : 'aucune suggestion';
+        sousTitre.textContent = `${amisTxt} · ${sugTxt}`;
+      }
+    }
+
+    detruireCyJoueur();
+
+    _cyJoueur = cytoscape({
+      container: c,
+      elements: reseau.elements,
+      layout: {
+        name: 'concentric',
+        concentric: (el) => (el.data('role') === 'centre' ? 3 : el.data('role') === 'ami' ? 2 : 1),
+        minNodeSpacing: 42,
+        spacingFactor: 1.15,
+        padding: 46,
+        animate: true,
+        animationDuration: 500,
+      },
+      style: styleGrapheEgo(),
+      minZoom: 0.3,
+      maxZoom: 2.5,
+      wheelSensitivity: 0.2,
+    });
+
+    _cyJoueur.on('layoutstop', () => {
+      if (_cyJoueur) _cyJoueur.fit(undefined, 48);
+    });
+
+    _cyJoueur.on('mouseover', 'node', (evt) => evt.target.addClass('hover'));
+    _cyJoueur.on('mouseout', 'node', (evt) => evt.target.removeClass('hover'));
+
+    // Clic simple → profil ; double-clic → explorer le réseau de ce joueur
+    _cyJoueur.on('tap', 'node', (evt) => {
+      const nid = evt.target.id();
+      if (typeof showProfil === 'function') showProfil(nid);
+    });
+
+    _cyJoueur.on('dbltap', 'node', (evt) => {
+      const nid = evt.target.id();
+      if (nid === _joueurGrapheId) return;
+      const input = document.getElementById('amisJoueurId');
+      if (input) input.value = nid;
+      if (typeof loadAmis === 'function') loadAmis();
+    });
+
+    _cyJoueur.on('tap', (evt) => {
+      if (evt.target === _cyJoueur) {
+        _cyJoueur.$('.dimmed').removeClass('dimmed');
+      }
+    });
+
+    if (loading) loading.style.display = 'none';
+    if (vide) vide.style.display = 'none';
+  } catch (e) {
+    detruireCyJoueur();
+    if (loading) loading.style.display = 'none';
+    if (vide) {
+      vide.textContent = `Graphe indisponible : ${e.message}`;
+      vide.style.display = 'grid';
+    }
+    if (sousTitre) sousTitre.textContent = '';
+  } finally {
+    _egoEnCours = false;
+  }
+}
+
+/* Recharge le graphe du joueur courant (après un ajout/retrait d'ami). */
+function rafraichirGrapheJoueur() {
+  if (_joueurGrapheId) chargerGrapheJoueur(_joueurGrapheId, { force: true });
+}
+
 /* ── Demandes d'ami ── */
 async function chargerDemandes() {
   const id = (document.getElementById('demandesId')?.value || '').trim();
@@ -276,6 +570,7 @@ async function actionDemande(action, idA, idB) {
     const idCourant = document.getElementById('amisJoueurId')?.value?.trim();
     if (idCourant) { loadAmisDirects(idCourant); loadAmisReco(idCourant); }
     if (_grapheCharge) chargerGraphe();
+    rafraichirGrapheJoueur();
   } catch (e) {
     toast(e.message, 'err');
   }
@@ -304,7 +599,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Graphe
   const btnGraphe = document.getElementById('grapheRefresh');
-  if (btnGraphe) btnGraphe.addEventListener('click', chargerGraphe);
+  if (btnGraphe) btnGraphe.addEventListener('click', () => {
+    chargerGraphe();
+    rafraichirGrapheJoueur();
+  });
+
+  // Graphe égo-centré du joueur recherché
+  const btnEgoFit = document.getElementById('grapheJoueurFit');
+  if (btnEgoFit) btnEgoFit.addEventListener('click', () => {
+    if (_cyJoueur) _cyJoueur.fit(undefined, 48);
+  });
+
+  const btnEgoRefresh = document.getElementById('grapheJoueurRefresh');
+  if (btnEgoRefresh) btnEgoRefresh.addEventListener('click', () => {
+    if (_joueurGrapheId) chargerGrapheJoueur(_joueurGrapheId, { force: true });
+  });
+
+  const toggleEgo = document.getElementById('grapheJoueurSuggestions');
+  if (toggleEgo) toggleEgo.addEventListener('change', () => {
+    if (_joueurGrapheId) chargerGrapheJoueur(_joueurGrapheId);
+  });
+
+  // Le canvas Cytoscape doit suivre la taille de la fenêtre
+  window.addEventListener('resize', () => {
+    if (_cyJoueur) _cyJoueur.resize();
+  });
 
   // Chargement paresseux quand la page Réseau s'ouvre
   const page = document.getElementById('page-amis');

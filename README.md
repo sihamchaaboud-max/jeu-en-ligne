@@ -105,6 +105,7 @@ python -m uvicorn app.api:app --reload --port 8000
 - **Session & connexion** : modale de connexion, session mémorisée localement (`localStorage`), changement de mot de passe depuis le dashboard
 - **Classement** : podium des 3 meilleurs, classement mondial complet **paginé** (`GET /api/classement?page=&par_page=`), fenêtre « autour de moi » (`GET /api/classement-autour/{id}?rayon=`)
 - **Réseau social visuel** : carte interactive du graphe d'amitiés (`GET /api/graphe`, Cytoscape.js), nœuds dimensionnés par score, clic → profil + suggestions mises en évidence
+- **Graphe égo-centré** : recherche d'un joueur par ID → graphe dynamique de son réseau (lui au centre, amis directs, suggestions reliées à leurs amis communs), double-clic sur un nœud pour explorer ce joueur
 - **Demandes d'ami** : envoi / acceptation / refus (`POST /api/demande-ami`, `POST /api/demande-ami/accepter`, `POST /api/demande-ami/refuser`, `GET /api/demandes-ami/{id}`) — relation Neo4j `AMI_DE` avec statut `en_attente` / `acceptee`
 - **Notifications en direct** : toasts quand un joueur monte au podium ou termine une partie, flash des lignes du classement
 - **Profil** : courbe de progression des scores (Chart.js) dans le tiroir de profil
