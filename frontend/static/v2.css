@@ -230,6 +230,66 @@
   padding: var(--sp-6);
 }
 
+/* ── GRAPHE ÉGO-CENTRÉ (réseau d'un joueur recherché) ── */
+.player-graph-shell {
+  margin-top: var(--sp-5);
+  margin-bottom: var(--sp-5);
+}
+
+.player-graph-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.player-graph-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.player-graph-heading > .icon-sm { color: var(--accent); flex-shrink: 0; }
+.player-graph-heading .section-title { margin: 0; }
+
+.player-graph-sub {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.player-graph-actions { flex-wrap: wrap; }
+
+.player-graph-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.player-graph-toggle input {
+  accent-color: var(--accent);
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+}
+
+.player-graph-wrap { height: 480px; }
+
+.graph-legend .lg-swatch-dashed {
+  border: 1.5px dashed rgba(155, 139, 232, 0.95);
+  background: rgba(155, 139, 232, 0.3) !important;
+}
+
+@media (max-width: 640px) {
+  .player-graph-wrap { height: 400px; }
+}
+
 /* ── PAGINATION ── */
 .pager {
   display: flex;

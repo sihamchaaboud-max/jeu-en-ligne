@@ -555,6 +555,7 @@ async function loadAmis() {
 
   loadAmisDirects(id);
   loadAmisReco(id);
+  if (typeof chargerGrapheJoueur === 'function') chargerGrapheJoueur(id, { force: true });
 }
 
 async function loadAmisDirects(id) {
@@ -661,6 +662,7 @@ async function ajouterAmi() {
     document.getElementById('newAmiId').value = '';
     loadAmisDirects(id);
     loadAmisReco(id);
+    if (typeof rafraichirGrapheJoueur === 'function') rafraichirGrapheJoueur();
   } catch (e) { toast(e.message, 'err'); }
 }
 
@@ -670,6 +672,7 @@ async function ajouterAmiDepuisReco(id, ami) {
     toast(r.message);
     loadAmisDirects(id);
     loadAmisReco(id);
+    if (typeof rafraichirGrapheJoueur === 'function') rafraichirGrapheJoueur();
   } catch (e) { toast(e.message, 'err'); }
 }
 
@@ -679,6 +682,7 @@ async function supprimerAmi(id, ami) {
     toast('Amitié supprimée');
     loadAmisDirects(id);
     loadAmisReco(id);
+    if (typeof rafraichirGrapheJoueur === 'function') rafraichirGrapheJoueur();
   } catch (e) { toast(e.message, 'err'); }
 }
 
@@ -915,6 +919,11 @@ document.getElementById('amisDirectsResult').addEventListener('click', (e) => {
 document.getElementById('amisRecoResult').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action="add-ami"]');
   if (btn) ajouterAmiDepuisReco(btn.dataset.a, btn.dataset.ami);
+});
+
+const _inputAmis = document.getElementById('amisJoueurId');
+if (_inputAmis) _inputAmis.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); loadAmis(); }
 });
 
 /* ── BOOT ── */

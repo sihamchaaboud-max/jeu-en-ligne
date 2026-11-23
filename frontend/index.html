@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="/static/fonts.css?v=20261121">
   <link rel="stylesheet" href="/static/style.css?v=20261121">
   <link rel="stylesheet" href="/static/quiz.css?v=20261121">
-  <link rel="stylesheet" href="/static/v2.css?v=20261121">
-  <link rel="stylesheet" href="/static/premium.css?v=20261121">
+  <link rel="stylesheet" href="/static/v2.css?v=20261122">
+  <link rel="stylesheet" href="/static/premium.css?v=20261122">
 </head>
 <body>
 
@@ -299,8 +299,46 @@
 
           <div class="page-hint" id="amisHint">
             <i data-lucide="info" class="icon-sm" aria-hidden="true"></i>
-            Saisis un identifiant (ex : <code>j1</code>) pour afficher ses amis directs,
-            les suggestions d'amis d'amis, et le classement entre amis.
+            Saisis un identifiant (ex : <code>j1</code>) pour afficher son réseau,
+            ses amis directs, les suggestions d'amis d'amis, et le classement entre amis.
+          </div>
+
+          <!-- Graphe égo-centré du joueur recherché -->
+          <div class="graph-shell player-graph-shell" id="grapheJoueurSection" style="display:none">
+            <div class="player-graph-toolbar">
+              <div class="player-graph-heading">
+                <i data-lucide="git-fork" class="icon-sm" aria-hidden="true"></i>
+                <div>
+                  <h2 class="section-title" id="grapheJoueurTitre">Réseau du joueur</h2>
+                  <p class="player-graph-sub" id="grapheJoueurSousTitre"></p>
+                </div>
+              </div>
+              <div class="inline-form-controls player-graph-actions">
+                <label class="player-graph-toggle">
+                  <input type="checkbox" id="grapheJoueurSuggestions" checked/>
+                  <span>Suggestions</span>
+                </label>
+                <button class="btn-ghost btn-sm" id="grapheJoueurFit" aria-label="Recentrer le graphe">
+                  <i data-lucide="maximize-2" class="icon-xs"></i>
+                  Recentrer
+                </button>
+                <button class="btn-ghost btn-sm" id="grapheJoueurRefresh" aria-label="Actualiser le réseau du joueur">
+                  <i data-lucide="refresh-cw" class="icon-xs"></i>
+                  Actualiser
+                </button>
+              </div>
+            </div>
+            <div class="graph-canvas-wrap player-graph-wrap">
+              <div id="grapheJoueurViz" aria-label="Visualisation du réseau du joueur recherché"></div>
+              <div class="graph-loading" id="grapheJoueurLoading">Chargement du réseau…</div>
+              <div class="graph-empty" id="grapheJoueurEmpty" style="display:none"></div>
+            </div>
+            <div class="graph-legend" aria-hidden="true">
+              <span class="lg-item"><span class="lg-swatch" style="background:#F2B03D"></span> Joueur recherché</span>
+              <span class="lg-item"><span class="lg-swatch" style="background:#5B9BE8"></span> Amis directs</span>
+              <span class="lg-item"><span class="lg-swatch lg-swatch-dashed" style="background:#9B8BE8"></span> Suggestions (amis d'amis)</span>
+              <span class="lg-item">Clic → profil · double-clic → explorer ce joueur</span>
+            </div>
           </div>
 
           <div id="amisTabs" style="display:none">
@@ -670,11 +708,11 @@
   <script src="/static/vendor/chart.umd.min.js?v=20261121"></script>
 
   <!-- Application -->
-  <script src="/static/app.js?v=20261121"></script>
+  <script src="/static/app.js?v=20261122"></script>
   <script src="/static/js/auth.js?v=20261121"></script>
   <script src="/static/js/notifications.js?v=20261121"></script>
   <script src="/static/js/leaderboard.js?v=20261121"></script>
-  <script src="/static/js/reseau.js?v=20261121"></script>
+  <script src="/static/js/reseau.js?v=20261122"></script>
   <script src="/static/js/charts.js?v=20261121"></script>
   <script src="/static/quiz.js?v=20261121"></script>
   <script src="/static/premium.js?v=20261121"></script>
