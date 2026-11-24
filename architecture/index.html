@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <title>Arena — Architecture</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Arena — Architecture">
+      <span class="brand-mark" aria-hidden="true">A</span>
+      <span>Arena <i>/</i> Architecture</span>
+    </a>
+    <span class="project-label"><span></span> JEU EN LIGNE</span>
+  </header>
+
+  <main class="page">
+    <section class="intro">
+      <p class="eyebrow">ARCHITECTURE DU PROJET</p>
+      <h1>Les composants essentiels.<br><span>Un seul flux.</span></h1>
+    </section>
+
+    <section class="diagram" aria-label="Architecture détaillée de l’application Arena">
+      <svg class="connections" id="connections" aria-hidden="true"></svg>
+
+      <section class="layer frontend-layer">
+        <p class="layer-heading"><span>01</span> FRONTEND</p>
+        <article class="component frontend" id="ui-auth" tabindex="0">
+          <span class="component-icon icon-frontend" aria-hidden="true">⌑</span>
+          <span class="component-copy"><strong>Session & connexion</strong><small>auth.js · JWT · localStorage</small></span>
+        </article>
+        <article class="component frontend" id="ui-quiz" tabindex="0">
+          <span class="component-icon icon-frontend" aria-hidden="true">?</span>
+          <span class="component-copy"><strong>Quiz</strong><small>quiz.js · démarrer / répondre</small></span>
+        </article>
+        <article class="component frontend" id="ui-ranking" tabindex="0">
+          <span class="component-icon icon-frontend" aria-hidden="true">↗</span>
+          <span class="component-copy"><strong>Classement</strong><small>leaderboard.js · Top 10 & pages</small></span>
+        </article>
+        <article class="component frontend" id="ui-social" tabindex="0">
+          <span class="component-icon icon-frontend" aria-hidden="true">⌘</span>
+          <span class="component-copy"><strong>Réseau social</strong><small>reseau.js · graphe Cytoscape</small></span>
+        </article>
+        <article class="component frontend" id="ui-dashboard" tabindex="0">
+          <span class="component-icon icon-frontend" aria-hidden="true">◫</span>
+          <span class="component-copy"><strong>Dashboard & temps réel</strong><small>app.js · API · WebSocket</small></span>
+        </article>
+      </section>
+
+      <section class="layer api-layer">
+        <p class="layer-heading"><span>02</span> API FASTAPI</p>
+        <article class="component api" id="api-auth" tabindex="0">
+          <span class="component-copy"><strong>Authentification</strong><small>/api/auth/login · mot-de-passe</small></span>
+          <span class="component-tag">REST</span>
+        </article>
+        <article class="component api" id="api-quiz" tabindex="0">
+          <span class="component-copy"><strong>Quiz</strong><small>/api/quiz/start · /answer</small></span>
+          <span class="component-tag">REST</span>
+        </article>
+        <article class="component api" id="api-ranking" tabindex="0">
+          <span class="component-copy"><strong>Classements</strong><small>/api/top10 · /classement*</small></span>
+          <span class="component-tag">REST</span>
+        </article>
+        <article class="component api" id="api-social" tabindex="0">
+          <span class="component-copy"><strong>Réseau & amitiés</strong><small>/api/graphe · /api/amis*</small></span>
+          <span class="component-tag">REST</span>
+        </article>
+        <article class="component api" id="api-players" tabindex="0">
+          <span class="component-copy"><strong>Joueurs & profils</strong><small>GET /api/joueurs · /api/joueur/{id}</small></span>
+          <span class="component-tag">REST</span>
+        </article>
+        <article class="component api websocket" id="api-ws" tabindex="0">
+          <span class="component-copy"><strong>Top 10 en direct</strong><small>/ws/top10 · connexion persistante</small></span>
+          <span class="component-tag">WS</span>
+        </article>
+      </section>
+
+      <section class="layer logic-layer">
+        <p class="layer-heading"><span>03</span> LOGIQUE MÉTIER</p>
+        <article class="component logic" id="svc-auth" tabindex="0">
+          <span class="component-icon icon-logic" aria-hidden="true">ƒ</span>
+          <span class="component-copy"><strong>auth_service.py</strong><small>PBKDF2 · JWT HS256</small></span>
+        </article>
+        <article class="component logic" id="svc-quiz" tabindex="0">
+          <span class="component-icon icon-logic" aria-hidden="true">ƒ</span>
+          <span class="component-copy"><strong>quiz_service.py</strong><small>Questions · chrono · points</small></span>
+        </article>
+        <article class="component logic" id="svc-player" tabindex="0">
+          <span class="component-icon icon-logic" aria-hidden="true">ƒ</span>
+          <span class="component-copy"><strong>JoueurService</strong><small>Création · Top 10 · amis</small></span>
+        </article>
+      </section>
+
+      <section class="layer data-layer">
+        <p class="layer-heading"><span>04</span> BASES DE DONNÉES</p>
+        <article class="component database mongo" id="db-mongo" tabindex="0">
+          <span class="component-icon icon-mongo" aria-hidden="true">◉</span>
+          <span class="component-copy"><strong>MongoDB</strong><small>Profils · inventaires · historique</small></span>
+          <span class="component-tag">27017</span>
+        </article>
+        <article class="component database redis" id="db-redis" tabindex="0">
+          <span class="component-icon icon-redis" aria-hidden="true">◇</span>
+          <span class="component-copy"><strong>Redis</strong><small>Scores · classement · quiz TTL</small></span>
+          <span class="component-tag">6379</span>
+        </article>
+        <article class="component database neo4j" id="db-neo4j" tabindex="0">
+          <span class="component-icon icon-neo4j" aria-hidden="true">⌘</span>
+          <span class="component-copy"><strong>Neo4j</strong><small>Amitiés · demandes · suggestions</small></span>
+          <span class="component-tag">7687</span>
+        </article>
+      </section>
+    </section>
+
+    <section class="flow-key" aria-label="Légende des flux">
+      <span><i class="key-line key-http"></i>HTTP / REST</span>
+      <span><i class="key-line key-ws"></i>WebSocket</span>
+      <span><i class="key-line key-call"></i>Appel de service</span>
+      <span><i class="key-line key-data"></i>Lecture / écriture</span>
+    </section>
+    <p class="flow-caption"><span class="flow-dot"></span> Survolez un composant pour mettre en évidence ses connexions directes.</p>
+  </main>
+  <script src="arch.js"></script>
+</body>
+</html>

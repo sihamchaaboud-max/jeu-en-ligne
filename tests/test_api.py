@@ -161,9 +161,21 @@ def test_login_joueur_sans_mdp_mode_heritage():
         assert r.status_code == 200
         assert r.json()["token"] is None
         assert r.json()["sans_mot_de_passe"] is True
+        assert r.json()["pseudo"] == "Legacy"
 
         r = client.post("/api/quiz/start", json={"joueur_id": "quiz_legacy"})
         assert r.status_code == 200
         service.redis.supprimer_partie(r.json()["partie_id"])
     finally:
         service.supprimer_joueur("quiz_legacy")
+
+
+def test_inscription_refusee_si_session_authentifiee():
+    """Un joueur connecté (JWT) ne peut pas créer un autre joueur."""
+    r = client.post(
+        "/api/joueur",
+        json={"id": "quiz_intrus", "pseudo": "Intrus", "niveau": 1, "score": 0},
+        headers={"Authorization": "Bearer un-jeton-quelconque"},
+    )
+    assert r.status_code == 403
+    assert not mongo.joueur_existe("quiz_intrus")

@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta name="description" content="Arena — console du jeu en ligne : joueurs (MongoDB), classements (Redis), réseau d'amis (Neo4j) et quiz de calcul mental."/>
   <title>Arena — NoSQL Dashboard</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%236c5ce7'/%3E%3Cpath d='M4 12V4h2v8zm3 0V6h2v6zm3 0V8h2v4z' fill='%23fff'/%3E%3C/svg%3E"/>
   <link rel="stylesheet" href="/static/fonts.css?v=20261121">
   <link rel="stylesheet" href="/static/style.css?v=20261121">
-  <link rel="stylesheet" href="/static/quiz.css?v=20261121">
-  <link rel="stylesheet" href="/static/v2.css?v=20261122">
+  <link rel="stylesheet" href="/static/quiz.css?v=20261125">
+  <link rel="stylesheet" href="/static/v2.css?v=20261125-4">
   <link rel="stylesheet" href="/static/premium.css?v=20261122">
 </head>
 <body>
@@ -54,13 +55,17 @@
             <i data-lucide="network" class="nav-icon"></i>
             <span class="nav-label">Réseau</span>
           </button>
+          <button class="nav-item" data-page="moi" id="navEspace" style="display:none">
+            <i data-lucide="user-round" class="nav-icon"></i>
+            <span class="nav-label">Mon espace</span>
+          </button>
           <button class="nav-item" data-page="quiz">
             <i data-lucide="brain" class="nav-icon"></i>
             <span class="nav-label">Quiz</span>
           </button>
-          <button class="nav-item" data-page="nouveau">
+          <button class="nav-item" data-page="nouveau" id="navInscription">
             <i data-lucide="user-plus" class="nav-icon"></i>
-            <span class="nav-label">Nouveau joueur</span>
+            <span class="nav-label">Inscription</span>
           </button>
         </div>
       </nav>
@@ -161,9 +166,9 @@
               <h1 class="page-title">Joueurs</h1>
               <p class="page-subtitle">Profils et inventaires stockés dans MongoDB.</p>
             </div>
-            <button class="btn-primary" onclick="showPage('nouveau')">
+            <button class="btn-primary" id="btnInscription" onclick="showPage('nouveau')">
               <i data-lucide="user-plus" class="icon-xs"></i>
-              Nouveau joueur
+              S'inscrire
             </button>
           </div>
 
@@ -411,14 +416,136 @@
 
         </section>
 
-        <!-- ══ NOUVEAU JOUEUR ══ -->
+        <!-- ══ MON ESPACE (privé, joueur connecté) ══ -->
+        <section id="page-moi" class="page espace-page">
+
+          <!-- ── En-tête profil ── -->
+          <div id="moiProfil">
+            <div class="skeleton-block" style="height:150px" role="status" aria-label="Chargement du profil"></div>
+          </div>
+
+          <!-- ── Graphe social — élément central ── -->
+          <div class="graph-shell player-graph-shell espace-graph" id="moiGrapheSection" style="display:none">
+            <div class="player-graph-toolbar">
+              <div class="player-graph-heading">
+                <i data-lucide="git-fork" class="icon-sm" aria-hidden="true"></i>
+                <div>
+                  <h2 class="section-title">Mon réseau</h2>
+                  <p class="player-graph-sub" id="moiGrapheSousTitre">Chargement…</p>
+                </div>
+              </div>
+              <div class="inline-form-controls player-graph-actions">
+                <label class="player-graph-toggle" title="Afficher / masquer les suggestions">
+                  <input type="checkbox" id="moiGrapheSuggestions" checked/>
+                  <span>Suggestions</span>
+                </label>
+                <label class="player-graph-toggle" title="Afficher / masquer les invitations en attente">
+                  <input type="checkbox" id="moiGrapheInvitations" checked/>
+                  <span>Invitations</span>
+                </label>
+                <div class="espace-zoom" role="group" aria-label="Zoom du graphe">
+                  <button class="btn-ghost btn-sm espace-zoom-btn" id="moiGrapheZoomOut" aria-label="Dézoomer">
+                    <i data-lucide="minus" class="icon-xs"></i>
+                  </button>
+                  <button class="btn-ghost btn-sm espace-zoom-btn" id="moiGrapheZoomIn" aria-label="Zoomer">
+                    <i data-lucide="plus" class="icon-xs"></i>
+                  </button>
+                </div>
+                <button class="btn-ghost btn-sm" id="moiGrapheFit" aria-label="Recentrer le graphe">
+                  <i data-lucide="maximize-2" class="icon-xs"></i>
+                  Recentrer
+                </button>
+              </div>
+            </div>
+
+            <div class="graph-canvas-wrap player-graph-wrap espace-graph-wrap">
+              <div id="moiGrapheViz" aria-label="Réseau d'amis interactif — moi au centre"></div>
+              <div class="graph-loading" id="moiGrapheLoading">Chargement du réseau…</div>
+              <div class="graph-empty" id="moiGrapheEmpty" style="display:none"></div>
+
+              <!-- Aperçu du nœud sélectionné (flottant, sur place) -->
+              <aside class="espace-node-panel" id="moiNodePanel" hidden aria-live="polite"></aside>
+
+              <!-- Indice d'usage -->
+              <div class="espace-graph-hint" id="moiGrapheHint">
+                <i data-lucide="mouse-pointer-click" class="icon-xs"></i>
+                Clique un nœud pour agir · molette pour zoomer · glisser pour déplacer
+              </div>
+            </div>
+
+            <!-- Légende — types de nœuds & de liaisons -->
+            <div class="graph-legend espace-legende">
+              <span class="lg-item"><span class="lg-swatch" style="background:#F2B03D"></span> Moi</span>
+              <span class="lg-item"><span class="lg-swatch" style="background:#6FA7E8"></span> Amis</span>
+              <span class="lg-item"><span class="lg-swatch lg-swatch-dashed" style="background:#9B8BE8"></span> Suggestion</span>
+              <span class="lg-item"><span class="lg-swatch lg-swatch-dashed lg-swatch-recue" style="background:#4CC38A"></span> Invitation reçue</span>
+              <span class="lg-item"><span class="lg-swatch lg-swatch-dashed lg-swatch-envoyee" style="background:#8A8FA3"></span> Invitation envoyée</span>
+              <span class="lg-sep" aria-hidden="true"></span>
+              <span class="lg-item"><span class="lg-line"></span> Amitié</span>
+              <span class="lg-item"><span class="lg-line lg-line-dashed"></span> Affinité / invitation en attente</span>
+            </div>
+          </div>
+
+          <!-- ── Invitations & Suggestions (panneau complémentaire) ── -->
+          <div class="espace-grid">
+
+            <div class="espace-col">
+              <div class="section-header">
+                <h2 class="section-title"><span class="k-num">A</span> Invitations</h2>
+                <span class="badge-label" id="moiInvitationsBadge"></span>
+              </div>
+              <div class="inline-form espace-invite-form">
+                <div class="inline-form-label">
+                  <i data-lucide="send" class="icon-xs" aria-hidden="true"></i>
+                  Envoyer une invitation
+                </div>
+                <div class="inline-form-controls">
+                  <input type="text" id="moiInviteId" placeholder="ID du joueur — ex : j2" class="input-inline" list="listeJoueurs" aria-label="ID du joueur à inviter"/>
+                  <button class="btn-primary btn-sm" id="moiInviteBtn">
+                    <i data-lucide="user-plus" class="icon-xs"></i>
+                    Inviter
+                  </button>
+                </div>
+              </div>
+              <div id="moiInvitations">
+                <div class="skeleton-block" style="height:90px" role="status" aria-label="Chargement des invitations"></div>
+              </div>
+            </div>
+
+            <div class="espace-col">
+              <div class="section-header">
+                <h2 class="section-title"><span class="k-num">B</span> Suggestions d'amis</h2>
+                <span class="badge-label">Neo4j · 2 degrés</span>
+              </div>
+              <div id="moiSuggestions">
+                <div class="skeleton-block" style="height:90px" role="status" aria-label="Chargement des suggestions"></div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- ── Mes amis ── -->
+          <div class="section-header">
+            <h2 class="section-title"><span class="k-num">C</span> Mes amis</h2>
+            <button class="btn-ghost btn-sm" id="moiAmisRefresh" aria-label="Actualiser mes amis">
+              <i data-lucide="refresh-cw" class="icon-xs"></i>
+              Actualiser
+            </button>
+          </div>
+          <div id="moiAmis">
+            <div class="skeleton-block" style="height:90px" role="status" aria-label="Chargement des amis"></div>
+          </div>
+
+        </section>
+
+        <!-- ══ INSCRIPTION ══ -->
         <section id="page-nouveau" class="page">
 
           <div class="page-header">
             <div>
-              <p class="page-kicker"><span class="k-num">05</span> <span class="k-rule" aria-hidden="true"></span> Gestion</p>
-              <h1 class="page-title">Nouveau joueur</h1>
-              <p class="page-subtitle">Création simultanée dans les trois bases, avec rollback si l'une échoue.</p>
+              <p class="page-kicker"><span class="k-num">05</span> <span class="k-rule" aria-hidden="true"></span> Compte</p>
+              <h1 class="page-title">Inscription</h1>
+              <p class="page-subtitle">Crée ton compte pour rejoindre le classement et jouer au quiz. Réservé aux visiteurs non connectés.</p>
             </div>
           </div>
 
@@ -426,7 +553,7 @@
 
             <div class="form-panel">
               <div class="form-panel-header">
-                <h3 class="form-panel-title">Créer un joueur</h3>
+                <h3 class="form-panel-title">Créer mon compte</h3>
                 <div class="db-pill-row" aria-label="Bases écrites">
                   <span class="db-pill db-pill-mongo">MongoDB</span>
                   <span class="db-pill db-pill-redis">Redis</span>
@@ -444,51 +571,17 @@
                   <label class="field-label" for="newPseudo">Pseudo <span class="required" aria-hidden="true">*</span></label>
                   <input type="text" id="newPseudo" class="field-input" placeholder="ex : Alice" required autocomplete="off"/>
                 </div>
-                <div class="field-row">
-                  <div class="field-group">
-                    <label class="field-label" for="newNiveau">Niveau initial</label>
-                    <input type="number" id="newNiveau" class="field-input" value="1" min="1" max="100"/>
-                  </div>
-                  <div class="field-group">
-                    <label class="field-label" for="newScore">Score initial</label>
-                    <input type="number" id="newScore" class="field-input" value="0" min="0"/>
-                  </div>
-                </div>
                 <div class="field-group">
                   <label class="field-label" for="newMdp">Mot de passe <span style="text-transform:none;letter-spacing:0">(optionnel)</span></label>
-                  <input type="password" id="newMdp" class="field-input" placeholder="protège son score de quiz" autocomplete="off"/>
-                  <span class="field-hint">Si défini, le joueur devra se connecter pour jouer au quiz</span>
+                  <input type="password" id="newMdp" class="field-input" placeholder="protège ton score de quiz" autocomplete="off"/>
+                  <span class="field-hint">Si défini, tu devras te connecter pour jouer au quiz. Sans mot de passe : mode héritage.</span>
                 </div>
                 <button type="submit" class="btn-primary btn-full">
                   <i data-lucide="user-plus" class="icon-xs"></i>
-                  Créer le joueur
+                  S'inscrire
                 </button>
               </form>
               <div id="createResult" aria-live="polite"></div>
-            </div>
-
-            <div class="form-panel">
-              <div class="form-panel-header">
-                <h3 class="form-panel-title">Mettre à jour un score</h3>
-                <span class="db-pill db-pill-redis">Redis</span>
-              </div>
-
-              <form onsubmit="ajouterPoints(event)" class="form-body" novalidate>
-                <div class="field-group">
-                  <label class="field-label" for="pointsId">ID du joueur</label>
-                  <input type="text" id="pointsId" class="field-input" placeholder="ex : j1" required autocomplete="off"/>
-                </div>
-                <div class="field-group">
-                  <label class="field-label" for="pointsVal">Points</label>
-                  <input type="number" id="pointsVal" class="field-input" value="100" required/>
-                  <span class="field-hint">Valeur négative pour retirer des points</span>
-                </div>
-                <button type="submit" class="btn-primary btn-full">
-                  <i data-lucide="zap" class="icon-xs"></i>
-                  Mettre à jour
-                </button>
-              </form>
-              <div id="pointsResult" aria-live="polite"></div>
             </div>
 
           </div>
@@ -511,18 +604,28 @@
               </div>
             </div>
 
-            <div class="form-panel quiz-start-panel">
+            <!-- Non connecté : le quiz est verrouillé -->
+            <div id="quizAuthGate" class="form-panel quiz-start-panel">
+              <div class="form-body">
+                <p class="field-hint" style="margin:0 0 14px">
+                  Connecte-toi pour lancer une partie. Ton score sera enregistré sous ton identité.
+                </p>
+                <button type="button" class="btn-primary btn-full" data-action="ouvrir-connexion">
+                  <i data-lucide="log-in" class="icon-xs"></i>
+                  Se connecter
+                </button>
+              </div>
+            </div>
+
+            <!-- Connecté : démarrage de la partie -->
+            <div id="quizStartPanel" class="form-panel quiz-start-panel quiz-hidden">
               <form id="quizFormDebut" class="form-body">
                 <div class="field-group">
-                  <label class="field-label" for="quizJoueurId">Ton ID de joueur <span class="required" aria-hidden="true">*</span></label>
-                  <input id="quizJoueurId" class="field-input" type="text"
-                         placeholder="ex : j1" autocomplete="off" required>
-                  <span class="field-hint">Ton score final est ajouté au classement Redis</span>
-                </div>
-                <div class="field-group">
-                  <label class="field-label" for="quizMdp">Mot de passe</label>
-                  <input id="quizMdp" class="field-input" type="password"
-                         placeholder="si tu en as défini un" autocomplete="off">
+                  <span class="field-label">Joueur connecté</span>
+                  <div class="session-chip" style="align-self:flex-start">
+                    <span class="avatar" id="quizIdentiteAvatar">?</span>
+                    <span class="session-name" id="quizIdentite">—</span>
+                  </div>
                 </div>
                 <div class="quiz-mode-row">
                   <label class="switch">
@@ -708,13 +811,14 @@
   <script src="/static/vendor/chart.umd.min.js?v=20261121"></script>
 
   <!-- Application -->
-  <script src="/static/app.js?v=20261122"></script>
-  <script src="/static/js/auth.js?v=20261121"></script>
+  <script src="/static/js/auth.js?v=20261125"></script>
+  <script src="/static/app.js?v=20261125-4"></script>
   <script src="/static/js/notifications.js?v=20261121"></script>
   <script src="/static/js/leaderboard.js?v=20261121"></script>
-  <script src="/static/js/reseau.js?v=20261122"></script>
+  <script src="/static/js/reseau.js?v=20261125-4"></script>
+  <script src="/static/js/social.js?v=20261125-2"></script>
   <script src="/static/js/charts.js?v=20261121"></script>
-  <script src="/static/quiz.js?v=20261121"></script>
+  <script src="/static/quiz.js?v=20261125"></script>
   <script src="/static/premium.js?v=20261121"></script>
   <script>
     // Init Lucide icons after DOM ready

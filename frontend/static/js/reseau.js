@@ -17,6 +17,11 @@ let _cyJoueur = null;          // graphe égo-centré du joueur recherché
 let _joueurGrapheId = null;    // dernier ID exploré
 let _egoEnCours = false;
 
+let _cyProfil = null;
+let _profilGrapheId = null;
+let _profilGrapheVersion = 0;
+let _profilCyResizeObserver = null;
+
 const _COULEUR_OR = '#F2B03D';
 const _COULEUR_NOEUD = '#6FA7E8';
 const _COULEUR_ARETE = 'rgba(245,243,236,0.14)';
@@ -292,10 +297,33 @@ function elementsEgo(donnees, id, avecSuggestions) {
   }
 
   return {
-    elements: noeuds.concat(aretes),
+    elements: positionnerElementsEgo(noeuds.concat(aretes)),
     nbAmis: amis.size,
     nbSuggestions: suggestions.size,
   };
+}
+
+function positionnerElementsEgo(elements) {
+  const groupes = { centre: [], ami: [], suggestion: [], recue: [], envoyee: [] };
+  for (const element of elements) {
+    if (element.data.source) continue;
+    const role = element.data.role || 'ami';
+    (groupes[role] || groupes.ami).push(element);
+  }
+
+  const rayons = { centre: 0, ami: 220, recue: 285, envoyee: 320, suggestion: 380 };
+  for (const [role, noeuds] of Object.entries(groupes)) {
+    if (role === 'centre') {
+      noeuds.forEach((n) => { n.position = { x: 0, y: 0 }; });
+      continue;
+    }
+    const rayon = Math.max(rayons[role] || 300, (noeuds.length * 54) / (2 * Math.PI));
+    noeuds.forEach((n, index) => {
+      const angle = -Math.PI / 2 + (index * 2 * Math.PI) / noeuds.length;
+      n.position = { x: Math.cos(angle) * rayon, y: Math.sin(angle) * rayon };
+    });
+  }
+  return elements;
 }
 
 function styleGrapheEgo() {
@@ -338,7 +366,6 @@ function styleGrapheEgo() {
         'underlay-padding': (el) => (el.data('role') === 'centre' ? 12 : 7),
         'underlay-shape': 'ellipse',
         'overlay-opacity': 0,
-        'cursor': 'pointer',
         'transition-property': 'border-color, border-width, underlay-opacity, underlay-padding, opacity',
         'transition-duration': 180,
       },
@@ -442,13 +469,9 @@ async function chargerGrapheJoueur(id, options = {}) {
       container: c,
       elements: reseau.elements,
       layout: {
-        name: 'concentric',
-        concentric: (el) => (el.data('role') === 'centre' ? 3 : el.data('role') === 'ami' ? 2 : 1),
-        minNodeSpacing: 42,
-        spacingFactor: 1.15,
+        name: 'preset',
+        fit: true,
         padding: 46,
-        animate: true,
-        animationDuration: 500,
       },
       style: styleGrapheEgo(),
       minZoom: 0.3,
@@ -501,6 +524,113 @@ async function chargerGrapheJoueur(id, options = {}) {
 /* Recharge le graphe du joueur courant (après un ajout/retrait d'ami). */
 function rafraichirGrapheJoueur() {
   if (_joueurGrapheId) chargerGrapheJoueur(_joueurGrapheId, { force: true });
+}
+
+function detruireCyProfil() {
+  _profilGrapheVersion += 1;
+  _profilGrapheId = null;
+  if (_profilCyResizeObserver) {
+    _profilCyResizeObserver.disconnect();
+    _profilCyResizeObserver = null;
+  }
+  if (_cyProfil) { _cyProfil.destroy(); _cyProfil = null; }
+}
+
+async function chargerGrapheProfil(id) {
+  id = (id || '').trim();
+  const c = document.getElementById('profilGrapheViz');
+  if (!c || !id) return;
+
+  detruireCyProfil();
+  const version = _profilGrapheVersion;
+  _profilGrapheId = id;
+
+  const loading = document.getElementById('profilGrapheLoading');
+  const vide = document.getElementById('profilGrapheEmpty');
+  const sousTitre = document.getElementById('profilGrapheSousTitre');
+  const toggle = document.getElementById('profilGrapheSuggestions');
+
+  if (loading) loading.style.display = 'grid';
+  if (vide) { vide.style.display = 'none'; vide.textContent = ''; }
+  if (sousTitre) sousTitre.textContent = 'Chargement du réseau…';
+
+  try {
+    const donnees = await api('/api/graphe');
+    if (version !== _profilGrapheVersion || !document.getElementById('profilDrawer').classList.contains('open')) return;
+    _grapheDonnees = donnees;
+
+    const avecSuggestions = toggle ? toggle.checked : true;
+    const reseau = elementsEgo(donnees, id, avecSuggestions);
+    if (!reseau) {
+      if (sousTitre) sousTitre.textContent = '';
+      if (vide) {
+        vide.textContent = `Joueur « ${id} » introuvable dans le graphe.`;
+        vide.style.display = 'grid';
+      }
+      if (loading) loading.style.display = 'none';
+      return;
+    }
+
+    const { nbAmis, nbSuggestions } = reseau;
+    if (sousTitre) {
+      if (!nbAmis) {
+        sousTitre.textContent = 'Aucun ami direct pour le moment.';
+      } else {
+        const amisTxt = `${nbAmis} ami${nbAmis > 1 ? 's' : ''} direct${nbAmis > 1 ? 's' : ''}`;
+        const sugTxt = nbSuggestions
+          ? `${nbSuggestions} suggestion${nbSuggestions > 1 ? 's' : ''}${avecSuggestions ? '' : ' masquée' + (nbSuggestions > 1 ? 's' : '')}`
+          : 'aucune suggestion';
+        sousTitre.textContent = `${amisTxt} · ${sugTxt}`;
+      }
+    }
+
+    const cy = cytoscape({
+      container: c,
+      elements: reseau.elements,
+      layout: {
+        name: 'preset',
+        fit: true,
+        padding: 34,
+      },
+      style: styleGrapheEgo(),
+      minZoom: 0.3,
+      maxZoom: 2.5,
+      wheelSensitivity: 0.2,
+    });
+    _cyProfil = cy;
+
+    const ajuster = () => {
+      if (_cyProfil !== cy || !c.clientWidth || !c.clientHeight) return;
+      cy.resize();
+      cy.fit(undefined, 30);
+    };
+    cy.on('layoutstop', ajuster);
+    ajuster();
+    requestAnimationFrame(ajuster);
+    if (typeof ResizeObserver !== 'undefined') {
+      _profilCyResizeObserver = new ResizeObserver(ajuster);
+      _profilCyResizeObserver.observe(c);
+    }
+
+    cy.on('mouseover', 'node', (evt) => evt.target.addClass('hover'));
+    cy.on('mouseout', 'node', (evt) => evt.target.removeClass('hover'));
+    cy.on('tap', 'node', (evt) => {
+      const nid = evt.target.id();
+      if (nid !== _profilGrapheId && typeof showProfil === 'function') showProfil(nid);
+    });
+
+    if (loading) loading.style.display = 'none';
+    if (vide) vide.style.display = 'none';
+  } catch (e) {
+    if (version !== _profilGrapheVersion) return;
+    detruireCyProfil();
+    if (loading) loading.style.display = 'none';
+    if (vide) {
+      vide.textContent = `Graphe indisponible : ${e.message}`;
+      vide.style.display = 'grid';
+    }
+    if (sousTitre) sousTitre.textContent = '';
+  }
 }
 
 /* ── Demandes d'ami ── */
@@ -620,9 +750,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (_joueurGrapheId) chargerGrapheJoueur(_joueurGrapheId);
   });
 
+  const zoneProfil = document.getElementById('profilContent');
+  if (zoneProfil) {
+    zoneProfil.addEventListener('click', (e) => {
+      if (e.target.closest('#profilGrapheFit') && _cyProfil) {
+        _cyProfil.animate({ fit: { padding: 30 } }, { duration: 380 });
+      }
+    });
+    zoneProfil.addEventListener('change', (e) => {
+      if (e.target.closest('#profilGrapheSuggestions') && _profilGrapheId) {
+        chargerGrapheProfil(_profilGrapheId);
+      }
+    });
+  }
+
   // Le canvas Cytoscape doit suivre la taille de la fenêtre
   window.addEventListener('resize', () => {
     if (_cyJoueur) _cyJoueur.resize();
+    if (_cyProfil) _cyProfil.resize();
   });
 
   // Chargement paresseux quand la page Réseau s'ouvre

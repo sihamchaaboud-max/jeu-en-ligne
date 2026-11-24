@@ -1037,7 +1037,8 @@ body > .content {
 .graph-canvas-wrap { height: 540px; }
 
 .graph-canvas-wrap #grapheViz,
-.graph-canvas-wrap #grapheJoueurViz {
+.graph-canvas-wrap #grapheJoueurViz,
+.graph-canvas-wrap #moiGrapheViz {
   width: 100%;
   height: 100%;
   background:

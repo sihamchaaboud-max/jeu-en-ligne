@@ -165,6 +165,28 @@
   justify-content: center;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Écran de lancement — centrage dans la zone de contenu
+   (sous la barre de navigation, à droite de la barre latérale)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Tant que l'écran de lancement est visible, la page occupe toute la
+   hauteur utile du contenu et recentre son bloc sur les deux axes. */
+#page-quiz.active:has(#quizDebut:not(.quiz-hidden)) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+}
+
+/* Le bloc de lancement garde sa largeur de lecture, centrée horizontalement */
+#quizDebut.quiz-panel-debut {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* ── Responsive ── */
 @media (max-width: 640px) {
   .quiz-question { font-size: 32px; }
@@ -174,4 +196,11 @@
   .quiz-actions .btn-primary,
   .quiz-actions .btn-ghost { width: 100%; justify-content: center; }
   .board-rank::before { display: none; }
+}
+
+/* Écrans courts : on repasse en haut pour éviter tout rognage */
+@media (max-height: 680px) {
+  #page-quiz.active:has(#quizDebut:not(.quiz-hidden)) {
+    justify-content: flex-start;
+  }
 }

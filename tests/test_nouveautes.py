@@ -4,6 +4,7 @@
 
 from fastapi.testclient import TestClient
 
+from app import auth_service as auth
 from app.api import app, service
 from app.services import mongo_service as mongo
 from app.services import neo4j_service as neo4j
@@ -11,6 +12,16 @@ from app.services import neo4j_service as neo4j
 client = TestClient(app)
 
 IDS = ["feat_g1", "feat_g2", "feat_g3", "feat_g4"]
+
+
+def _token(joueur_id):
+    """En-tête Authorization d'un joueur (jeton forgé, comme le ferait un login)."""
+    return {"Authorization": f"Bearer {auth.creer_token(joueur_id)}"}
+
+
+def _proteger(joueur_id, mot_de_passe="secret123"):
+    """Donne un mot de passe à un joueur : il exige alors son propre jeton."""
+    mongo.definir_mot_de_passe(joueur_id, auth.hacher_mot_de_passe(mot_de_passe))
 
 
 def calculer(texte):
@@ -165,3 +176,137 @@ def test_quiz_mode_entrainement_ne_compte_pas():
 def test_quiz_mode_invalide_422():
     r = client.post("/api/quiz/start", json={"joueur_id": "feat_g4", "mode": "hardcore"})
     assert r.status_code == 422
+
+
+# ─────────────────────────────────────────────
+# Espace social — profil + réseau en une requête
+# ─────────────────────────────────────────────
+def test_espace_social_agrege_profil_reseau_et_invitations():
+    client.post("/api/demande-ami", json={"id_de": "feat_g3", "id_vers": "feat_g1"})
+
+    r = client.get("/api/social/feat_g1")
+    assert r.status_code == 200
+    d = r.json()
+
+    # MongoDB → identité et inventaire ; Redis → score et rang
+    assert d["profil"]["id"] == "feat_g1"
+    assert d["profil"]["pseudo"] == "GrapheUn"
+    assert d["profil"]["score"] == service.redis.get_score("feat_g1")
+    assert "mot_de_passe" not in d["profil"]
+    assert "inventaire" in d["profil"]
+    assert "nb_parties" in d["stats"]
+
+    # Neo4j → amitiés acceptées + invitations en attente
+    assert [a["id"] for a in d["amis"]] == ["feat_g2"]
+    assert d["profil"]["nb_amis"] == 1
+    assert [x["id"] for x in d["demandes"]["recues"]] == ["feat_g3"]
+    assert d["demandes"]["envoyees"] == []
+
+
+def test_suggestions_excluent_les_invitations_en_attente():
+    # feat_g3 est ami d'amie de feat_g1 (via feat_g2) → c'est une suggestion
+    avant = client.get("/api/social/feat_g1").json()["suggestions"]
+    assert "feat_g3" in [s["id"] for s in avant]
+
+    # ...mais dès qu'une invitation est en attente, elle disparaît des suggestions
+    r = client.post("/api/demande-ami", json={"id_de": "feat_g3", "id_vers": "feat_g1"})
+    assert r.status_code == 201
+    apres = client.get("/api/social/feat_g1").json()["suggestions"]
+    assert "feat_g3" not in [s["id"] for s in apres]
+
+
+# ─────────────────────────────────────────────
+# Espace social — sécurité (comptes protégés par mot de passe)
+# ─────────────────────────────────────────────
+def test_espace_social_prive():
+    _proteger("feat_g1")
+
+    assert client.get("/api/social/feat_g1").status_code == 401            # sans jeton
+    assert client.get("/api/social/feat_g1", headers=_token("feat_g4")).status_code == 403
+    assert client.get("/api/social/feat_g1", headers=_token("feat_g1")).status_code == 200
+
+
+def test_boite_de_reception_privee():
+    _proteger("feat_g1")
+
+    assert client.get("/api/demandes-ami/feat_g1").status_code == 401
+    assert client.get("/api/demandes-ami/feat_g1", headers=_token("feat_g4")).status_code == 403
+    assert client.get("/api/demandes-ami/feat_g1", headers=_token("feat_g1")).status_code == 200
+
+
+def test_invitation_refusee_sans_le_jeton_du_demandeur():
+    _proteger("feat_g2")
+
+    # un compte protégé ne peut pas envoyer une demande sans son jeton…
+    r = client.post("/api/demande-ami", json={"id_de": "feat_g2", "id_vers": "feat_g4"})
+    assert r.status_code == 401
+
+    # …ni avec le jeton d'un autre joueur (usurpation)
+    r = client.post("/api/demande-ami", json={"id_de": "feat_g2", "id_vers": "feat_g4"},
+                    headers=_token("feat_g4"))
+    assert r.status_code == 403
+
+    # avec son propre jeton, la demande aboutit
+    r = client.post("/api/demande-ami", json={"id_de": "feat_g2", "id_vers": "feat_g4"},
+                    headers=_token("feat_g2"))
+    assert r.status_code == 201
+
+
+def test_acceptation_reservee_au_destinataire():
+    client.post("/api/demande-ami", json={"id_de": "feat_g3", "id_vers": "feat_g1"})
+    _proteger("feat_g1")
+
+    # un tiers, même avec un jeton valide, ne peut pas accepter à la place du destinataire
+    r = client.post("/api/demande-ami/accepter",
+                    json={"id_de": "feat_g3", "id_vers": "feat_g1"},
+                    headers=_token("feat_g4"))
+    assert r.status_code == 403
+    assert neo4j.sont_amis("feat_g3", "feat_g1") is False
+
+    # le destinataire peut accepter → l'amitié est bidirectionnelle
+    r = client.post("/api/demande-ami/accepter",
+                    json={"id_de": "feat_g3", "id_vers": "feat_g1"},
+                    headers=_token("feat_g1"))
+    assert r.status_code == 200
+    assert neo4j.sont_amis("feat_g1", "feat_g3") is True
+    assert neo4j.sont_amis("feat_g3", "feat_g1") is True
+    assert neo4j.get_demandes("feat_g1")["recues"] == []
+
+
+def test_refus_par_un_tiers_interdit():
+    client.post("/api/demande-ami", json={"id_de": "feat_g3", "id_vers": "feat_g1"})
+    _proteger("feat_g3")
+    _proteger("feat_g1")
+
+    r = client.post("/api/demande-ami/refuser",
+                    json={"id_de": "feat_g3", "id_vers": "feat_g1"},
+                    headers=_token("feat_g4"))
+    assert r.status_code == 403
+
+    # deux comptes protégés : sans jeton, plus aucun accès
+    r = client.post("/api/demande-ami/refuser",
+                    json={"id_de": "feat_g3", "id_vers": "feat_g1"})
+    assert r.status_code == 401
+
+    # le destinataire refuse → plus rien en attente, aucune amitié créée
+    r = client.post("/api/demande-ami/refuser",
+                    json={"id_de": "feat_g3", "id_vers": "feat_g1"},
+                    headers=_token("feat_g1"))
+    assert r.status_code == 200
+    assert neo4j.sont_amis("feat_g3", "feat_g1") is False
+    assert neo4j.get_demandes("feat_g1")["recues"] == []
+
+
+def test_amitie_directe_reservee_a_sa_propre_identite():
+    _proteger("feat_g4")
+
+    # on ne peut pas modifier le réseau d'un autre joueur
+    r = client.post("/api/ami", json={"id_a": "feat_g1", "id_b": "feat_g4"},
+                    headers=_token("feat_g4"))
+    assert r.status_code == 403
+
+    # en son propre nom, c'est autorisé
+    r = client.post("/api/ami", json={"id_a": "feat_g4", "id_b": "feat_g1"},
+                    headers=_token("feat_g4"))
+    assert r.status_code == 201
+    assert neo4j.sont_amis("feat_g1", "feat_g4") is True
