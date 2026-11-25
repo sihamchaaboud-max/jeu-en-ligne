@@ -18,49 +18,59 @@ from app.services import neo4j_service as neo4j
 from app.services import mongo_service as mongo
 
 # --------------------------------------------------
+# Identifiants au format « pseudo-suffixe » (ex. salma-a3f9c1)
+# --------------------------------------------------
+OUSSAMA, SIHAM, YASSINE, SALMA, MEHDI = (
+    "oussama-1f3a9c", "siham-7d2e10", "yassine-4b8c22", "salma-a3f9c1", "mehdi-2c6df4",
+)
+ANAS, IMANE, KARIM, NADA, HAMZA = (
+    "anas-9e1b57", "imane-6a4d83", "karim-8f0c25", "nada-3d7b91", "hamza-5e2a48",
+)
+
+# --------------------------------------------------
 # 10 joueurs de test
 # --------------------------------------------------
 JOUEURS = [
-    {"id": "j1",  "nom": "Oussama", "niveau": 10, "score": 8500},
-    {"id": "j2",  "nom": "Siham",   "niveau": 8,  "score": 7200},
-    {"id": "j3",  "nom": "Yassine", "niveau": 7,  "score": 6800},
-    {"id": "j4",  "nom": "Salma",   "niveau": 9,  "score": 9100},
-    {"id": "j5",  "nom": "Mehdi",   "niveau": 5,  "score": 4200},
-    {"id": "j6",  "nom": "Anas",    "niveau": 6,  "score": 5500},
-    {"id": "j7",  "nom": "Imane",   "niveau": 4,  "score": 3100},
-    {"id": "j8",  "nom": "Karim",   "niveau": 3,  "score": 2400},
-    {"id": "j9",  "nom": "Nada",    "niveau": 7,  "score": 6600},
-    {"id": "j10", "nom": "Hamza",   "niveau": 5,  "score": 4800},
+    {"id": OUSSAMA, "nom": "Oussama", "niveau": 10, "score": 8500},
+    {"id": SIHAM,   "nom": "Siham",   "niveau": 8,  "score": 7200},
+    {"id": YASSINE, "nom": "Yassine", "niveau": 7,  "score": 6800},
+    {"id": SALMA,   "nom": "Salma",   "niveau": 9,  "score": 9100},
+    {"id": MEHDI,   "nom": "Mehdi",   "niveau": 5,  "score": 4200},
+    {"id": ANAS,    "nom": "Anas",    "niveau": 6,  "score": 5500},
+    {"id": IMANE,   "nom": "Imane",   "niveau": 4,  "score": 3100},
+    {"id": KARIM,   "nom": "Karim",   "niveau": 3,  "score": 2400},
+    {"id": NADA,    "nom": "Nada",    "niveau": 7,  "score": 6600},
+    {"id": HAMZA,   "nom": "Hamza",   "niveau": 5,  "score": 4800},
 ]
 
 # --------------------------------------------------
 # Amitiés (réseau avec amis d'amis exploitables)
 # --------------------------------------------------
 AMITIES = [
-    ("j1", "j2"), ("j1", "j3"), ("j1", "j5"),
-    ("j2", "j4"), ("j2", "j6"),
-    ("j3", "j7"), ("j3", "j9"),
-    ("j4", "j8"),
-    ("j5", "j10"),
-    ("j6", "j7"),
-    ("j8", "j9"),
-    ("j9", "j10"),
+    (OUSSAMA, SIHAM), (OUSSAMA, YASSINE), (OUSSAMA, MEHDI),
+    (SIHAM, SALMA), (SIHAM, ANAS),
+    (YASSINE, IMANE), (YASSINE, NADA),
+    (SALMA, KARIM),
+    (MEHDI, HAMZA),
+    (ANAS, IMANE),
+    (KARIM, NADA),
+    (NADA, HAMZA),
 ]
 
 # --------------------------------------------------
 # Inventaires de test
 # --------------------------------------------------
 INVENTAIRES = {
-    "j1":  [("épée", 1), ("potion", 3)],
-    "j2":  [("arc", 1), ("flèche", 20)],
-    "j3":  [("bouclier", 1)],
-    "j4":  [("épée", 1), ("armure", 1), ("potion", 5)],
-    "j5":  [("baguette", 1), ("potion", 2)],
-    "j6":  [("hache", 1)],
-    "j7":  [("arc", 1), ("potion", 4)],
-    "j8":  [],
-    "j9":  [("épée", 1), ("bouclier", 1)],
-    "j10": [("potion", 10)],
+    OUSSAMA: [("épée", 1), ("potion", 3)],
+    SIHAM:   [("arc", 1), ("flèche", 20)],
+    YASSINE: [("bouclier", 1)],
+    SALMA:   [("épée", 1), ("armure", 1), ("potion", 5)],
+    MEHDI:   [("baguette", 1), ("potion", 2)],
+    ANAS:    [("hache", 1)],
+    IMANE:   [("arc", 1), ("potion", 4)],
+    KARIM:   [],
+    NADA:    [("épée", 1), ("bouclier", 1)],
+    HAMZA:   [("potion", 10)],
 }
 
 
@@ -98,13 +108,13 @@ def run():
     for entry in service.get_top_10_global():
         print(f"  #{entry['rang']}  {entry['nom']:<10}  {entry['score']} pts")
 
-    print("\n--- Classement entre amis de j1 (Oussama) ---")
-    for entry in service.get_classement_amis("j1"):
+    print("\n--- Classement entre amis de Oussama ---")
+    for entry in service.get_classement_amis(OUSSAMA):
         print(f"  #{entry['rang']}  {entry['nom']:<10}  {entry['score']} pts")
 
-    print("\n--- Amis d'amis de j1 (recommandations) ---")
-    for rec in neo4j.get_amis_d_amis("j1"):
-        print(f"  {rec['id']:<6} {rec['pseudo']:<10}  ({rec['amis_communs']} amis en commun)")
+    print("\n--- Amis d'amis de Oussama (recommandations) ---")
+    for rec in neo4j.get_amis_d_amis(OUSSAMA):
+        print(f"  {rec['id']:<20} {rec['pseudo']:<10}  ({rec['amis_communs']} amis en commun)")
 
     service.close()
 

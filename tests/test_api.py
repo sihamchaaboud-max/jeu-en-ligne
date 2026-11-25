@@ -174,8 +174,24 @@ def test_inscription_refusee_si_session_authentifiee():
     """Un joueur connecté (JWT) ne peut pas créer un autre joueur."""
     r = client.post(
         "/api/joueur",
-        json={"id": "quiz_intrus", "pseudo": "Intrus", "niveau": 1, "score": 0},
+        json={"pseudo": "Intrus", "niveau": 1, "score": 0},
         headers={"Authorization": "Bearer un-jeton-quelconque"},
     )
     assert r.status_code == 403
-    assert not mongo.joueur_existe("quiz_intrus")
+
+
+def test_inscription_genere_un_id_au_nouveau_format():
+    """L'inscription attribue côté serveur un id « pseudo-suffixe » lisible et unique."""
+    import re
+
+    from app.joueur_service import FORMAT_ID
+
+    r = client.post("/api/joueur", json={"pseudo": "Élodie Martin", "niveau": 1, "score": 0})
+    assert r.status_code == 201
+    pid = r.json()["id"]
+    try:
+        assert re.match(FORMAT_ID, pid)
+        assert pid.startswith("elodie-martin-")
+        assert mongo.get_pseudo(pid) == "Élodie Martin"
+    finally:
+        service.supprimer_joueur(pid)
