@@ -95,19 +95,18 @@ def afficher_menu():
     print(f"  {c(YELLOW,'1.')}  Créer un joueur")
     print(f"  {c(YELLOW,'2.')}  Ajouter une amitié")
     print(f"  {c(YELLOW,'3.')}  Voir le profil complet d'un joueur")
-    print(f"  {c(YELLOW,'4.')}  Ajouter des points à un joueur")
-    print(f"  {c(CYAN,'5.')}  🏆 Top 10 global")
-    print(f"  {c(CYAN,'6.')}  👥 Classement entre amis")
-    print(f"  {c(CYAN,'7.')}  Voir les amis d'un joueur")
-    print(f"  {c(CYAN,'8.')}  Voir les amis d'amis (recommandations)")
-    print(f"  {c(MAGENTA,'9.')}  Voir l'inventaire")
-    print(f"  {c(MAGENTA,'10.')} Ajouter un objet à l'inventaire")
-    print(f"  {c(MAGENTA,'11.')} Retirer un objet de l'inventaire")
-    print(f"  {c(MAGENTA,'12.')} Modifier le niveau d'un joueur")
-    print(f"  {c(YELLOW,'13.')} Supprimer une amitié")
-    print(f"  {c(RED,'14.')} Supprimer un joueur")
-    print(f"  {c(WHITE,'15.')} Statistiques globales")
-    print(f"  {c(GREEN,'16.')} Lister tous les joueurs")
+    print(f"  {c(CYAN,'4.')}  🏆 Top 10 global")
+    print(f"  {c(CYAN,'5.')}  👥 Classement entre amis")
+    print(f"  {c(CYAN,'6.')}  Voir les amis d'un joueur")
+    print(f"  {c(CYAN,'7.')}  Voir les amis d'amis (recommandations)")
+    print(f"  {c(MAGENTA,'8.')}  Voir l'inventaire")
+    print(f"  {c(MAGENTA,'9.')}  Ajouter un objet à l'inventaire")
+    print(f"  {c(MAGENTA,'10.')} Retirer un objet de l'inventaire")
+    print(f"  {c(MAGENTA,'11.')} Modifier le niveau d'un joueur")
+    print(f"  {c(YELLOW,'12.')} Supprimer une amitié")
+    print(f"  {c(RED,'13.')} Supprimer un joueur")
+    print(f"  {c(WHITE,'14.')} Statistiques globales")
+    print(f"  {c(GREEN,'15.')} Lister tous les joueurs")
     print(f"  {c(RED,'0.')}  Quitter")
     print(f"{CYAN}{'─'*54}{RESET}")
 
@@ -179,19 +178,6 @@ def action_voir_profil(service: JoueurService):
     else:
         print(f"  {CYAN}│{RESET}  Inventaire   : vide")
     print(f"  {CYAN}└──────────────────────────────────────────{RESET}")
-
-
-def action_ajouter_points(service: JoueurService):
-    print(f"\n{BOLD}── Ajouter des points ──{RESET}")
-    joueur_id = input("  ID du joueur : ").strip()
-    if not mongo.joueur_existe(joueur_id):
-        print(c(RED, f"  ✗ Joueur '{joueur_id}' introuvable."))
-        return
-    points = input("  Points à ajouter (négatif pour enlever) : ").strip()
-    nouveau = service.redis.increment_score(joueur_id, int(points))
-    rang    = service.redis.get_rang(joueur_id)
-    pseudo  = mongo.get_pseudo(joueur_id)
-    print(c(GREEN, f"\n  ✓ {pseudo} : nouveau score = {int(nouveau)} pts  (rang #{rang})"))
 
 
 def action_top_10(service: JoueurService):
@@ -521,19 +507,18 @@ def main():
         "1":  action_creer_joueur,
         "2":  action_ajouter_ami,
         "3":  action_voir_profil,
-        "4":  action_ajouter_points,
-        "5":  action_top_10,
-        "6":  action_classement_amis,
-        "7":  action_voir_amis,
-        "8":  action_amis_damis,
-        "9":  action_voir_inventaire,
-        "10": action_ajouter_objet,
-        "11": action_retirer_objet,
-        "12": action_modifier_niveau,
-        "13": action_supprimer_ami,
-        "14": action_supprimer_joueur,
-        "15": action_statistiques,
-        "16": action_lister_joueurs,
+        "4":  action_top_10,
+        "5":  action_classement_amis,
+        "6":  action_voir_amis,
+        "7":  action_amis_damis,
+        "8":  action_voir_inventaire,
+        "9":  action_ajouter_objet,
+        "10": action_retirer_objet,
+        "11": action_modifier_niveau,
+        "12": action_supprimer_ami,
+        "13": action_supprimer_joueur,
+        "14": action_statistiques,
+        "15": action_lister_joueurs,
     }
 
     while True:
