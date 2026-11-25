@@ -1,0 +1,13 @@
+/* Ajouts pour script.js (ne modifie pas style.css) */
+.db-view { height: calc(100vh - var(--header-height)); }
+.arch-wrap { display: flex; align-items: stretch; gap: 0; }
+.arch-wrap .diagram-container { flex: 1; min-width: 0; }
+.info-panel { position: relative; border-radius: 0 var(--radius-xl) var(--radius-xl) 0; }
+.svg-box { cursor: pointer; transition: opacity .2s; }
+.svg-box:hover rect.box-bg { filter: brightness(1.3); }
+#arch-canvas svg, .db-diagram-canvas svg { display: block; width: 100%; height: 100%; }
+.search-result-item.active { background: var(--bg-glass-strong); }
+.open-db-btn { padding: 8px 14px; border-radius: var(--radius-sm); background: var(--accent); color: #fff; font-size: .8125rem; font-weight: 600; }
+.open-db-btn:hover { background: var(--accent-light); }
+.entity-group-note { font-size: .6875rem; color: var(--text-muted); padding: 0 8px; }
+@media (max-width: 900px) { .arch-wrap { flex-direction: column; } .info-panel { width: 100%; border-radius: var(--radius-lg); } }
