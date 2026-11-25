@@ -137,7 +137,6 @@ Le menu permet de :
 - Consulter le classement entre amis
 - Voir les amis et amis d'amis
 - Gérer les inventaires
-- Mettre à jour les scores
 
 ### Tests
 

@@ -106,31 +106,37 @@
   }
 
   // ─────────────────────────────────────────────
-  // Connexion (si le joueur a un mot de passe)
+  // Authentification obligatoire avant de jouer
   // ─────────────────────────────────────────────
-  async function connecter(joueurId, motDePasse) {
-    tokenCourant = null;
-    if (!motDePasse) {
-      // Session existante (auth.js) : on réutilise son token si compatible
-      if (typeof tokenSession === "function") {
-        const t = tokenSession();
-        const s = (typeof sessionCourante === "function") ? sessionCourante() : null;
-        if (t && s && s.joueur_id === joueurId) tokenCourant = t;
-      }
-      return;
-    }
+  function sessionAuth() {
+    const s = (typeof sessionCourante === "function") ? sessionCourante() : null;
+    const auth = (typeof estAuthentifie === "function") ? estAuthentifie() : !!s;
+    return { s, auth };
+  }
 
-    const reponse = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ joueur_id: joueurId, mot_de_passe: motDePasse }),
-    });
-    const json = await reponse.json();
-    if (!reponse.ok) {
-      throw new Error(json.detail || "Connexion impossible");
+  /* Affiche le panneau de connexion ou le formulaire de démarrage. */
+  function majAuthQuiz() {
+    const { s, auth } = sessionAuth();
+    const gate = $("quizAuthGate");
+    const panel = $("quizStartPanel");
+    if (gate) gate.classList.toggle("quiz-hidden", auth);
+    if (panel) panel.classList.toggle("quiz-hidden", !auth);
+
+    const idEl = $("quizIdentite");
+    const avEl = $("quizIdentiteAvatar");
+    if (auth && s) {
+      joueurCourant = s.joueur_id;
+      tokenCourant = s.token || null;
+      const nom = s.pseudo || s.joueur_id;
+      if (idEl) idEl.textContent = `${nom} (${s.joueur_id})`;
+      if (avEl) avEl.textContent = nom.substring(0, 2).toUpperCase();
+    } else {
+      joueurCourant = "";
+      tokenCourant = null;
+      if (idEl) idEl.textContent = "—";
+      if (avEl) avEl.textContent = "?";
+      if (partieId) abandonner();
     }
-    if (json.sans_mot_de_passe) return;   // joueur du seed sans mot de passe
-    tokenCourant = json.token;
   }
 
   // ─────────────────────────────────────────────
@@ -138,15 +144,23 @@
   // ─────────────────────────────────────────────
   async function commencer(evenement) {
     evenement.preventDefault();
-    const joueurId = $("quizJoueurId").value.trim();
-    const motDePasse = $("quizMdp").value;
+    const { s, auth } = sessionAuth();
     const mode = $("quizModeEntrainement") && $("quizModeEntrainement").checked
       ? "entrainement" : "classe";
-    if (!joueurId) return;
     afficherErreur("");
 
+    // Aucun quiz sans authentification préalable.
+    if (!auth || !s) {
+      afficherErreur("Connecte-toi avant de jouer.");
+      if (typeof ouvrirConnexion === "function") ouvrirConnexion();
+      return;
+    }
+
+    const joueurId = s.joueur_id;
+    joueurCourant = joueurId;
+    tokenCourant = s.token || null;
+
     try {
-      await connecter(joueurId, motDePasse);
       const d = await appelerApi("/api/quiz/start", { joueur_id: joueurId, mode: mode });
       joueurCourant = joueurId;
       partieId = d.partie_id;
@@ -311,8 +325,9 @@
   function rejouer() {
     afficherErreur("");
     montrer("quizDebut");
-    $("quizJoueurId").value = joueurCourant;
-    $("quizJoueurId").focus();
+    majAuthQuiz();
+    const btn = document.querySelector('#quizFormDebut button[type="submit"]');
+    if (btn) btn.focus();
   }
 
   function voirClassement() {
@@ -339,15 +354,9 @@
   $("quizRejouer").addEventListener("click", rejouer);
   $("quizVoirClassement").addEventListener("click", voirClassement);
 
-  // Identité pré-remplie depuis la session (auth.js chargé avant)
-  const session = (typeof sessionCourante === "function") ? sessionCourante() : null;
-  if (session) {
-    const champId = $("quizJoueurId");
-    if (champId && !champId.value) {
-      champId.value = session.joueur_id;
-      if (!$("quizMdp").value) champId.focus();
-    }
-  }
+  // Connexion obligatoire : le formulaire n'apparaît qu'après authentification
+  majAuthQuiz();
+  document.addEventListener('arena:session', majAuthQuiz);
 
   // Titre de la barre du haut pour la page quiz
   const boutonMenu = document.querySelector('.nav-item[data-page="quiz"]');
@@ -355,7 +364,8 @@
     boutonMenu.addEventListener("click", () => {
       const titre = $("topbarTitle");
       if (titre) titre.textContent = "Quiz de calcul";
-      $("quizJoueurId").focus();
+      const btn = document.querySelector('#quizFormDebut button[type="submit"]');
+      if (btn) btn.focus();
     });
   }
 

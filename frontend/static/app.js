@@ -12,8 +12,13 @@ let _currentPage    = 'dashboard';
 
 /* ── API ── */
 async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (typeof tokenSession === 'function') {
+    const token = tokenSession();
+    if (token) headers.Authorization = 'Bearer ' + token;
+  }
   const r = await fetch(API + path, {
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     ...opts,
   });
   if (!r.ok) {
@@ -84,11 +89,22 @@ const PAGE_TITLES = {
   joueurs:    'Joueurs',
   classement: 'Classement',
   amis:       'Réseau',
+  moi:        'Mon espace',
   quiz:       'Quiz de calcul',
-  nouveau:    'Nouveau joueur',
+  nouveau:    'Inscription',
 };
 
 function showPage(name) {
+  // L'inscription est réservée aux visiteurs : un joueur connecté n'y a pas accès.
+  if (name === 'nouveau' && typeof estAuthentifie === 'function' && estAuthentifie()) {
+    if (typeof toast === 'function') toast('Déjà connecté : l\'inscription est réservée aux visiteurs.', 'err');
+    name = 'dashboard';
+  }
+  // Mon espace est privé : réservé aux joueurs connectés.
+  if (name === 'moi' && !(typeof estAuthentifie === 'function' && estAuthentifie())) {
+    if (typeof toast === 'function') toast('Connecte-toi pour ouvrir ton espace.', 'err');
+    name = 'dashboard';
+  }
   _currentPage = name;
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -117,6 +133,7 @@ function showPage(name) {
   if (name === 'dashboard')  { loadStats(); loadTop10(); }
   if (name === 'joueurs')    { loadJoueurs(); }
   if (name === 'classement') { loadTop10Full(); }
+  if (name === 'moi' && typeof chargerMonEspace === 'function') chargerMonEspace();
 
   // Close mobile sidebar
   document.getElementById('sidebar').classList.remove('mobile-open');
@@ -124,6 +141,20 @@ function showPage(name) {
 
 function refreshCurrent() {
   showPage(_currentPage);
+}
+
+/* L'inscription (création de joueur) n'est visible que hors connexion ;
+   « Mon espace » n'est visible qu'une fois connecté. */
+function appliquerReglesAuth() {
+  const auth = typeof estAuthentifie === 'function' && estAuthentifie();
+  const nav = document.getElementById('navInscription');
+  if (nav) nav.style.display = auth ? 'none' : '';
+  const btn = document.getElementById('btnInscription');
+  if (btn) btn.style.display = auth ? 'none' : '';
+  const navEspace = document.getElementById('navEspace');
+  if (navEspace) navEspace.style.display = auth ? '' : 'none';
+  if (auth && _currentPage === 'nouveau') showPage('dashboard');
+  if (!auth && _currentPage === 'moi') showPage('dashboard');
 }
 
 /* ── TAB SYSTEM ── */
@@ -167,9 +198,12 @@ document.querySelectorAll('.tab-bar').forEach(initTabs);
 
 /* ── DRAWER ── */
 let _drawerPreviousFocus = null;
+let _profilRequete = 0;
 
 function openDrawer() {
-  _drawerPreviousFocus = document.activeElement;
+  if (!document.getElementById('profilDrawer').classList.contains('open')) {
+    _drawerPreviousFocus = document.activeElement;
+  }
   document.getElementById('profilDrawer').classList.add('open');
   document.getElementById('drawerOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
@@ -179,6 +213,8 @@ function openDrawer() {
 }
 
 function closeDrawer() {
+  _profilRequete += 1;
+  if (typeof detruireCyProfil === 'function') detruireCyProfil();
   document.getElementById('profilDrawer').classList.remove('open');
   document.getElementById('drawerOverlay').classList.remove('open');
   document.body.style.overflow = '';
@@ -428,15 +464,18 @@ function filterJoueurs() {
 
 /* ── PROFIL (DRAWER) ── */
 async function showProfil(id) {
+  const requete = ++_profilRequete;
   const title   = document.getElementById('profilTitre');
   const content = document.getElementById('profilContent');
 
   title.textContent = 'Chargement…';
+  if (typeof detruireCyProfil === 'function') detruireCyProfil();
   content.innerHTML = '<div class="skeleton-block"></div>';
   openDrawer();
 
   try {
     const j = await api(`/api/joueur/${id}`);
+    if (requete !== _profilRequete) return;
     title.textContent = j.pseudo;
 
     const invHtml = j.inventaire?.length
@@ -479,6 +518,37 @@ async function showProfil(id) {
         </div>
       </div>
 
+      <div class="profil-section profil-graphe-section">
+        <div class="profil-graphe-heading">
+          <div>
+            <div class="profil-section-title">Réseau d'amis — Neo4j</div>
+            <p class="profil-graphe-sub" id="profilGrapheSousTitre">Chargement du réseau…</p>
+          </div>
+          <div class="profil-graphe-actions">
+            <label class="player-graph-toggle" title="Afficher / masquer les suggestions">
+              <input type="checkbox" id="profilGrapheSuggestions" checked/>
+              <span>Suggestions</span>
+            </label>
+            <button class="btn-ghost btn-sm" id="profilGrapheFit" aria-label="Recentrer le réseau">
+              <i data-lucide="maximize-2" class="icon-xs"></i>
+            </button>
+          </div>
+        </div>
+        <div class="graph-shell profil-graphe-shell">
+          <div class="graph-canvas-wrap profil-graphe-wrap">
+            <div id="profilGrapheViz" aria-label="Réseau d'amis interactif du joueur"></div>
+            <div class="graph-loading" id="profilGrapheLoading">Chargement du réseau…</div>
+            <div class="graph-empty" id="profilGrapheEmpty" style="display:none"></div>
+          </div>
+          <div class="graph-legend profil-graphe-legend">
+            <span class="lg-item"><span class="lg-swatch" style="background:#F2B03D"></span> Joueur</span>
+            <span class="lg-item"><span class="lg-swatch" style="background:#6FA7E8"></span> Amis</span>
+            <span class="lg-item"><span class="lg-swatch lg-swatch-dashed" style="background:#9B8BE8"></span> Suggestions</span>
+            <span class="lg-item">Clic sur un nœud → son profil</span>
+          </div>
+        </div>
+      </div>
+
       <div class="profil-section">
         <div class="profil-section-title">Inventaire — MongoDB</div>
         <div class="tag-list">${invHtml}</div>
@@ -495,10 +565,6 @@ async function showProfil(id) {
       </div>
 
       <div class="profil-actions">
-        <button class="btn-primary btn-sm" data-action="add-points" data-id="${esc(j.id)}">
-          <i data-lucide="zap" class="icon-xs"></i>
-          +100 pts
-        </button>
         <button class="btn-danger" data-action="delete-player" data-id="${esc(j.id)}" data-pseudo="${esc(j.pseudo)}">
           <i data-lucide="trash-2" class="icon-xs"></i>
           Supprimer
@@ -506,24 +572,13 @@ async function showProfil(id) {
       </div>`;
 
     reinitIcons();
-    // Charger l'historique en parallèle dans la section déjà injectée
     chargerHistorique(j.id, content.querySelector('#profilHistorique'));
+    if (typeof chargerGrapheProfil === 'function') chargerGrapheProfil(j.id);
   } catch (e) {
+    if (requete !== _profilRequete) return;
     content.innerHTML = errorState(e.message);
     reinitIcons();
   }
-}
-
-async function quickAddPoints(id) {
-  try {
-    const r = await api(`/api/score/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ points: 100 }),
-    });
-    toast(`Score mis à jour — ${fmtScore(r.nouveau_score)} pts · rang #${r.rang}`);
-    showProfil(id);
-    loadStats();
-  } catch (e) { toast(e.message, 'err'); }
 }
 
 async function quickDelete(id, pseudo) {
@@ -691,49 +746,37 @@ async function creerJoueur(e) {
   e.preventDefault();
   const result = document.getElementById('createResult');
   const btn    = e.target.querySelector('button[type="submit"]');
+  const motDePasse = document.getElementById('newMdp').value;
   const data = {
     id:     document.getElementById('newId').value.trim(),
     pseudo: document.getElementById('newPseudo').value.trim(),
-    niveau: parseInt(document.getElementById('newNiveau').value) || 1,
-    score:  parseInt(document.getElementById('newScore').value)  || 0,
-    mot_de_passe: document.getElementById('newMdp').value,
+    niveau: 1,
+    score:  0,
+    mot_de_passe: motDePasse,
   };
   result.innerHTML = '';
   btn.disabled = true;
   try {
     const r = await api('/api/joueur', { method: 'POST', body: JSON.stringify(data) });
-    result.innerHTML = `<div class="state-success"><i data-lucide="check-circle" class="icon-xs"></i>${r.message}</div>`;
-    toast('Joueur créé dans les 3 bases');
-    e.target.reset();
-    document.getElementById('newNiveau').value = '1';
-    document.getElementById('newScore').value  = '0';
-    loadStats();
-    reinitIcons();
-  } catch (err) {
-    result.innerHTML = `<div class="state-error"><i data-lucide="alert-circle" class="icon-xs"></i>${err.message}</div>`;
-    toast(err.message, 'err');
-    reinitIcons();
-  } finally {
-    btn.disabled = false;
-  }
-}
 
-/* ── AJOUTER POINTS ── */
-async function ajouterPoints(e) {
-  e.preventDefault();
-  const id     = document.getElementById('pointsId').value.trim();
-  const pts    = parseInt(document.getElementById('pointsVal').value);
-  const result = document.getElementById('pointsResult');
-  const btn    = e.target.querySelector('button[type="submit"]');
-  result.innerHTML = '';
-  btn.disabled = true;
-  try {
-    const r = await api(`/api/score/${id}`, { method: 'PUT', body: JSON.stringify({ points: pts }) });
-    result.innerHTML = `<div class="state-success">
-      <i data-lucide="check-circle" class="icon-xs"></i>
-      Nouveau score : <strong>${fmtScore(r.nouveau_score)} pts</strong> — rang #${r.rang}
-    </div>`;
-    toast(`Score mis à jour — ${fmtScore(r.nouveau_score)} pts`);
+    // Inscription = ouverture de session immédiate : le joueur n'a plus
+    // accès au formulaire « ajouter un joueur » une fois connecté.
+    if (typeof connecterJoueur === 'function') {
+      try {
+        await connecterJoueur(data.id, motDePasse);
+        result.innerHTML = `<div class="state-success"><i data-lucide="check-circle" class="icon-xs"></i>Compte créé — bienvenue ${data.pseudo} !</div>`;
+        toast('Compte créé — tu es connecté');
+        e.target.reset();
+        loadStats();
+        reinitIcons();
+        showPage('dashboard');
+        return;
+      } catch (_) { /* l'inscription a réussi : on propose la connexion manuelle */ }
+    }
+
+    result.innerHTML = `<div class="state-success"><i data-lucide="check-circle" class="icon-xs"></i>${r.message}</div>`;
+    toast('Compte créé dans les 3 bases');
+    e.target.reset();
     loadStats();
     reinitIcons();
   } catch (err) {
@@ -907,7 +950,6 @@ document.getElementById('joueursContainer').addEventListener('click', (e) => {
 document.getElementById('profilContent').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
-  if (btn.dataset.action === 'add-points')    quickAddPoints(btn.dataset.id);
   if (btn.dataset.action === 'delete-player') quickDelete(btn.dataset.id, btn.dataset.pseudo);
 });
 
@@ -937,5 +979,7 @@ function pageDepuisHash() {
 }
 showPage(pageDepuisHash());
 window.addEventListener('hashchange', () => showPage(pageDepuisHash()));
+document.addEventListener('arena:session', appliquerReglesAuth);
+appliquerReglesAuth();
 
 setInterval(checkStatus, 30_000);
