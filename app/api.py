@@ -228,7 +228,6 @@ async def diffuser_social(evenement: str, joueurs: list[str], **details) -> None
 # ─────────────────────────────────────────────
 
 class JoueurCreate(BaseModel):
-    id:           str = Field(..., example="j11", description="Identifiant unique commun aux 3 bases")
     pseudo:       str = Field(..., example="Alice",  description="Nom affiché")
     niveau:       int = Field(1,   ge=1, le=100, example=1)
     score:        int = Field(0,   ge=0, example=0)
@@ -236,8 +235,8 @@ class JoueurCreate(BaseModel):
 
 
 class AmitiéCreate(BaseModel):
-    id_a: str = Field(..., example="j1")
-    id_b: str = Field(..., example="j2")
+    id_a: str = Field(..., example="oussama-1f3a9c")
+    id_b: str = Field(..., example="siham-7d2e10")
 
 
 class NiveauUpdate(BaseModel):
@@ -250,12 +249,12 @@ class ObjetAction(BaseModel):
 
 
 class DemandeAmiCreate(BaseModel):
-    id_de:   str = Field(..., example="j3", description="Demandeur")
-    id_vers: str = Field(..., example="j1", description="Cible qui devra accepter")
+    id_de:   str = Field(..., example="siham-7d2e10", description="Demandeur")
+    id_vers: str = Field(..., example="oussama-1f3a9c", description="Cible qui devra accepter")
 
 
 class QuizStart(BaseModel):
-    joueur_id: str = Field(..., example="j1")
+    joueur_id: str = Field(..., example="salma-a3f9c1")
     mode:       str = Field("classe", example="classe",
                             description="'classe' (compte au classement) ou 'entrainement' (sans score)")
 
@@ -266,12 +265,12 @@ class QuizAnswer(BaseModel):
 
 
 class AuthDefinir(BaseModel):
-    joueur_id:    str = Field(..., example="j1")
+    joueur_id:    str = Field(..., example="salma-a3f9c1")
     mot_de_passe: str = Field(..., min_length=4, example="monSecret42")
 
 
 class AuthLogin(BaseModel):
-    joueur_id:    str = Field(..., example="j1")
+    joueur_id:    str = Field(..., example="salma-a3f9c1")
     mot_de_passe: str = Field(..., example="monSecret42")
 
 
@@ -451,6 +450,9 @@ def creer_joueur(data: JoueurCreate, authorization: str | None = Header(None)):
     Crée le joueur **simultanément** dans les 3 bases avec rollback de compensation :
     si Neo4j échoue après MongoDB et Redis, les données orphelines sont supprimées.
 
+    L'identifiant est **généré par le serveur** au format « pseudo-suffixe »
+    (ex. `salma-a3f9c1`) : il est lisible, unique et non devinable.
+
     L'inscription est réservée aux visiteurs : une session authentifiée (JWT)
     ne peut pas créer un autre joueur.
     """
@@ -459,11 +461,10 @@ def creer_joueur(data: JoueurCreate, authorization: str | None = Header(None)):
             403,
             "Déjà connecté : l'inscription est réservée aux visiteurs non connectés",
         )
-    if mongo.joueur_existe(data.id):
-        raise HTTPException(409, f"Le joueur '{data.id}' existe déjà")
-    service.creer_joueur(data.id, data.pseudo, data.niveau, data.score,
+    joueur_id = service.generer_id_unique(data.pseudo)
+    service.creer_joueur(joueur_id, data.pseudo, data.niveau, data.score,
                          mot_de_passe=data.mot_de_passe)
-    return {"message": f"Joueur '{data.pseudo}' créé avec succès", "id": data.id}
+    return {"message": f"Joueur '{data.pseudo}' créé avec succès", "id": joueur_id}
 
 
 @app.delete("/api/joueur/{joueur_id}", tags=["Joueurs"], summary="Supprimer un joueur")

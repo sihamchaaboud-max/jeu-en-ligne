@@ -23,6 +23,13 @@ async function api(path, opts = {}) {
   });
   if (!r.ok) {
     const err = await r.json().catch(() => ({ detail: r.statusText }));
+    // Token expiré / invalide : on déconnecte silencieusement pour éviter
+    // une page « cassée » (ex. espace personnel) et on invite à se reconnecter.
+    if (r.status === 401 && typeof tokenSession === 'function' && tokenSession()) {
+      if (typeof seDeconnecter === 'function') seDeconnecter();
+      if (typeof toast === 'function') toast('Session expirée — reconnecte-toi', 'err');
+      if (typeof ouvrirConnexion === 'function') ouvrirConnexion();
+    }
     throw new Error(err.detail || r.statusText);
   }
   return r.json();
@@ -748,7 +755,6 @@ async function creerJoueur(e) {
   const btn    = e.target.querySelector('button[type="submit"]');
   const motDePasse = document.getElementById('newMdp').value;
   const data = {
-    id:     document.getElementById('newId').value.trim(),
     pseudo: document.getElementById('newPseudo').value.trim(),
     niveau: 1,
     score:  0,
@@ -763,7 +769,7 @@ async function creerJoueur(e) {
     // accès au formulaire « ajouter un joueur » une fois connecté.
     if (typeof connecterJoueur === 'function') {
       try {
-        await connecterJoueur(data.id, motDePasse);
+        await connecterJoueur(r.id, motDePasse);
         result.innerHTML = `<div class="state-success"><i data-lucide="check-circle" class="icon-xs"></i>Compte créé — bienvenue ${data.pseudo} !</div>`;
         toast('Compte créé — tu es connecté');
         e.target.reset();

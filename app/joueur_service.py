@@ -13,10 +13,34 @@ Styles des services partenaires :
   - neo4j_service  : fonctionnel (Salma)   — fonctions directes
 """
 
+import re
+import secrets
+import unicodedata
+
 from app import auth_service as auth
 from app.services.redis_service import RedisService
 from app.services import mongo_service as mongo
 from app.services import neo4j_service as neo4j
+
+# Format d'identifiant : slug du pseudo + suffixe hexadécimal (ex. « salma-a3f9c1 »).
+FORMAT_ID = r"^[a-z0-9]+(?:-[a-z0-9]+)*-[0-9a-f]{6}$"
+
+
+def _slugifier(texte: str) -> str:
+    """« Élodie Martin » -> « elodie-martin » (minuscules, sans accents, tirets)."""
+    sans_accents = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", sans_accents).strip("-").lower()
+    return slug or "joueur"
+
+
+def generer_id(pseudo: str, longueur_suffixe: int = 6) -> str:
+    """Identifiant lisible et robuste : slug du pseudo + suffixe hexadécimal aléatoire.
+
+    Le suffixe aléatoire évite les collisions entre pseudos identiques et rend
+    l'identifiant difficile à deviner. Exemple : « Salma » -> « salma-a3f9c1 ».
+    """
+    suffixe = secrets.token_hex((longueur_suffixe + 1) // 2)[:longueur_suffixe]
+    return f"{_slugifier(pseudo)}-{suffixe}"
 
 
 class JoueurService:
@@ -72,6 +96,17 @@ class JoueurService:
             mongo.supprimer_profil(joueur_id)
             self.redis.delete_score(joueur_id)
             raise
+
+    def generer_id_unique(self, pseudo: str, essais: int = 10) -> str:
+        """Génère un identifiant au nouveau format, garanti non utilisé.
+
+        Retente avec un nouveau suffixe si le candidat existe déjà (collision).
+        """
+        for _ in range(essais):
+            candidat = generer_id(pseudo)
+            if not mongo.joueur_existe(candidat):
+                return candidat
+        raise RuntimeError("Impossible de générer un identifiant unique")
 
     # ==================================================
     # Top 10 global

@@ -563,13 +563,9 @@
 
               <form onsubmit="creerJoueur(event)" class="form-body" novalidate>
                 <div class="field-group">
-                  <label class="field-label" for="newId">Identifiant unique <span class="required" aria-hidden="true">*</span></label>
-                  <input type="text" id="newId" class="field-input" placeholder="ex : j11" required autocomplete="off"/>
-                  <span class="field-hint">Clé commune aux 3 bases de données</span>
-                </div>
-                <div class="field-group">
                   <label class="field-label" for="newPseudo">Pseudo <span class="required" aria-hidden="true">*</span></label>
                   <input type="text" id="newPseudo" class="field-input" placeholder="ex : Alice" required autocomplete="off"/>
+                  <span class="field-hint">Ton identifiant de joueur est généré automatiquement à partir de ton pseudo.</span>
                 </div>
                 <div class="field-group">
                   <label class="field-label" for="newMdp">Mot de passe <span style="text-transform:none;letter-spacing:0">(optionnel)</span></label>
@@ -812,7 +808,7 @@
 
   <!-- Application -->
   <script src="/static/js/auth.js?v=20261125"></script>
-  <script src="/static/app.js?v=20261125-4"></script>
+  <script src="/static/app.js?v=20261125-6"></script>
   <script src="/static/js/notifications.js?v=20261121"></script>
   <script src="/static/js/leaderboard.js?v=20261121"></script>
   <script src="/static/js/reseau.js?v=20261125-4"></script>

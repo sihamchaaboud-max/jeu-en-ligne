@@ -44,6 +44,16 @@ def supprimer_noeud(joueur_id: str) -> None:
     _run("MATCH (j:Joueur {id: $id}) DETACH DELETE j", id=joueur_id)
 
 
+def renommer_id(ancien_id: str, nouveau_id: str) -> None:
+    """Change l'identifiant d'un noeud (migration de format d'id).
+
+    Les relations d'amitié restent attachées au noeud : seul `id` change,
+    aucun lien n'est perdu.
+    """
+    _run("MATCH (j:Joueur {id: $ancien}) SET j.id = $nouveau",
+         ancien=ancien_id, nouveau=nouveau_id)
+
+
 # ---------------- amitiés ----------------
 # Une relation AMI_DE porte un statut :
 #   "acceptee"   — amitié confirmée (les vieilles relations sans statut comptent comme acceptées)
